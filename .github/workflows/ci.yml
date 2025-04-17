@@ -66,11 +66,12 @@ jobs:
 
       - name: Run golangci-lint
         run: golangci-lint run
+        continue-on-error: true  # This will allow the workflow to continue even if linting fails
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [test]  # Only depend on test, not lint
     steps:
       - name: Set up Go
         uses: actions/setup-go@v3

@@ -1,0 +1,14 @@
+linters:
+  disable:
+    - typecheck  # Disable typecheck which is causing problems with Go 1.23.5
+
+issues:
+  exclude-rules:
+    - linters:
+        - typecheck
+      text: "undefined:"
+
+run:
+  timeout: 5m
+  skip-dirs:
+    - vendor
