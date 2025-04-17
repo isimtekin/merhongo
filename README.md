@@ -8,7 +8,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/isimtekin/merhongo.svg)](https://pkg.go.dev/github.com/isimtekin/merhongo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/isimtekin/merhongo)](https://goreportcard.com/report/github.com/isimtekin/merhongo)
-[![Test Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen)](https://github.com/isimtekin/merhongo)
+[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](https://github.com/isimtekin/merhongo)
 [![CI](https://github.com/isimtekin/merhongo/actions/workflows/ci.yml/badge.svg)](https://github.com/isimtekin/merhongo/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/isimtekin/merhongo/branch/main/graph/badge.svg)](https://codecov.io/gh/isimtekin/merhongo)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/isimtekin/merhongo/blob/main/LICENSE)
@@ -29,7 +29,8 @@ Merhongo combines the power of the official MongoDB Go driver with an intuitive 
 ✅ **Middleware Support**: Pre/post operation hooks for advanced workflows  
 ✅ **Robust Error Handling**: Standardized error types and helpful utilities  
 ✅ **Automatic Timestamps**: Built-in createdAt/updatedAt field management  
-✅ **High Test Coverage**: 92% of code covered by tests  
+✅ **Connection Management**: Singleton pattern with support for multiple named connections  
+✅ **High Test Coverage**: 85% of code covered by tests  
 ✅ **Comprehensive Documentation**: Detailed examples and guides
 
 ## Requirements
@@ -55,10 +56,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/isimtekin/merhongo/connection"
-	"github.com/isimtekin/merhongo/model"
-	"github.com/isimtekin/merhongo/schema"
+	"github.com/isimtekin/merhongo"
 	"github.com/isimtekin/merhongo/errors"
+	"github.com/isimtekin/merhongo/schema"
 )
 
 // Define your document structure
@@ -73,14 +73,14 @@ type User struct {
 
 func main() {
 	// Connect to MongoDB
-	client, err := connection.Connect("mongodb://localhost:27017", "my_database")
+	client, err := merhongo.Connect("mongodb://localhost:27017", "my_database")
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
-	defer client.Disconnect()
+	defer merhongo.Disconnect()
 
 	// Define a schema
-	userSchema := schema.New(
+	userSchema := merhongo.SchemaNew(
 		map[string]schema.Field{
 			"Username": {
 				Type:     "",
@@ -100,7 +100,7 @@ func main() {
 	)
 
 	// Create a model
-	userModel := model.New("User", userSchema, client.Database)
+	userModel := merhongo.ModelNew("User", userSchema, client.Database)
 
 	// Create a new user
 	ctx := context.Background()
@@ -134,6 +134,40 @@ func main() {
 }
 ```
 
+## Using the Connection Manager
+
+Merhongo provides a powerful connection management system:
+
+```go
+// Default connection
+client, err := merhongo.Connect("mongodb://localhost:27017", "my_database")
+if err != nil {
+    log.Fatalf("Failed to connect: %v", err)
+}
+defer merhongo.Disconnect()
+
+// Access the default connection anywhere in your code
+defaultClient := merhongo.GetConnection()
+
+// Multiple named connections
+usersClient, err := merhongo.ConnectWithName("users", "mongodb://localhost:27017", "users_db")
+if err != nil {
+    log.Fatalf("Failed to connect to users DB: %v", err)
+}
+
+productsClient, err := merhongo.ConnectWithName("products", "mongodb://localhost:27017", "products_db")
+if err != nil {
+    log.Fatalf("Failed to connect to products DB: %v", err)
+}
+
+// Disconnect all connections at once
+defer merhongo.DisconnectAll()
+
+// Access named connections anywhere in your code
+usersConnection := merhongo.GetConnectionByName("users")
+productsConnection := merhongo.GetConnectionByName("products")
+```
+
 ## Using the Query Builder
 
 Merhongo provides a powerful query builder for creating MongoDB queries:
@@ -142,12 +176,12 @@ Merhongo provides a powerful query builder for creating MongoDB queries:
 import (
 	"context"
 	"fmt"
-	"github.com/isimtekin/merhongo/query"
+	"github.com/isimtekin/merhongo"
 )
 
 func findActiveUsers(ctx context.Context, userModel *model.Model) {
 	// Create a query using the builder
-	q := query.New().
+	q := merhongo.QueryNew().
 		Where("active", true).
 		GreaterThan("age", 18).
 		In("role", []string{"user", "admin"}).
@@ -174,7 +208,7 @@ func findActiveUsers(ctx context.Context, userModel *model.Model) {
 	fmt.Printf("Total count: %d\n", count)
 	
 	// Advanced query with regex
-	q = query.New().
+	q = merhongo.QueryNew().
 		Regex("username", "^j", "i").  // usernames starting with 'j', case insensitive
 		GreaterThanOrEqual("age", 21).
 		Exists("email", true).         // must have email field
@@ -189,7 +223,7 @@ func findActiveUsers(ctx context.Context, userModel *model.Model) {
 	// Update all matched documents
 	modifiedCount, err := userModel.UpdateWithQuery(
 		ctx, 
-		query.New().Where("active", false),
+		merhongo.QueryNew().Where("active", false),
 		map[string]interface{}{"active": true, "updatedAt": time.Now()},
 	)
 	if err != nil {
@@ -225,12 +259,13 @@ Merhongo is thoroughly tested to ensure reliability:
 
 | Package     | Coverage |
 |-------------|----------|
-| connection  | 90% |
-| model       | 94% |
-| schema      | 100% |
-| query       | 80% |
+| merhongo    | 100% |
+| connection  | 100% |
+| model       | 89% |
+| schema      | 49% |
+| query       | 85% |
 | errors      | 100% |
-| **Overall** | **82%** |
+| **Overall** | **84%** |
 
 The high test coverage helps ensure that Merhongo is stable and reliable for production use.
 
@@ -293,6 +328,7 @@ make clean
 
 ```
 merhongo/
+├── merhongo.go          # Top-level package with singleton access
 ├── connection/          # MongoDB connection management
 ├── schema/              # Schema definition and validation
 ├── model/               # Models and CRUD operations
@@ -315,11 +351,12 @@ merhongo/
 | Query Builder           | ✅       | ❌   | ❌               | ❌     |
 | Error Types             | ✅       | ⚠️ Limited | ⚠️ Limited    | ❌     |
 | Automatic Timestamps    | ✅       | ❌   | ❌               | ✅     |
+| Connection Management   | ✅       | ⚠️ Limited | ⚠️ Limited    | ❌     |
 | Active Development      | ✅       | ❌   | ✅               | ⚠️ Limited |
 
 ## Roadmap
 
-- **v0.2.0**: Enhanced schema validation, support for nested schemas
+- **v0.2.0**: ✅ Connection management with singleton pattern, enhanced structure
 - **v0.3.0**: Aggregation pipeline builder
 - **v0.4.0**: Population (references) support
 - **v0.5.0**: Transactions and bulk operations helpers
