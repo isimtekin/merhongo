@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # MongoDB service
+  mongodb:
+    image: mongo:latest
+    container_name: merhongo-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=merhongo_test
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - merhongo-network
+    # Healthcheck ensures the database is ready before dependent services start
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Mongo Express for database management (optional)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: merhongo-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=pass
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - merhongo-network
+
+networks:
+  merhongo-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  mongodb_config:

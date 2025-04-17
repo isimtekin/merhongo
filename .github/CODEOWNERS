@@ -1,0 +1,18 @@
+# These owners will be the default owners for everything in
+# the repo. Unless a later match takes precedence,
+# @isimtekin will be requested for review when someone opens a pull request.
+*       @isimtekin
+
+# Specific package ownership
+/connection/  @isimtekin
+/model/       @isimtekin
+/schema/      @isimtekin
+/query/       @isimtekin
+/errors/      @isimtekin
+
+# Documentation ownership
+/docs/        @isimtekin
+*.md          @isimtekin
+
+# Testing related files
+*_test.go     @isimtekin

@@ -1,0 +1,20 @@
+<svg width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+    <!-- Gopher Head -->
+    <circle cx="75" cy="75" r="40" fill="#3cc" />
+
+    <!-- Eyes -->
+    <circle cx="60" cy="65" r="10" fill="white"/>
+    <circle cx="90" cy="65" r="10" fill="white"/>
+    <circle cx="62" cy="67" r="4" fill="black"/>
+    <circle cx="92" cy="67" r="4" fill="black"/>
+
+    <!-- Nose -->
+    <circle cx="75" cy="85" r="5" fill="black"/>
+
+    <!-- Teeth -->
+    <rect x="70" y="95" width="4" height="10" fill="white"/>
+    <rect x="76" y="95" width="4" height="10" fill="white"/>
+
+    <!-- Leaf -->
+    <path d="M75 35 C85 20, 105 40, 75 55" fill="#4CAF50" />
+</svg>
