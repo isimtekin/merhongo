@@ -15,6 +15,9 @@ COVER_ARGS = -coverpkg=./... -coverprofile=coverage.out
 # Package list
 PACKAGES = ./...
 
+# Exclude patterns for coverage
+COVERAGE_EXCLUDE = -not -path "*/example/*" -not -name "main.go"
+
 # Default target
 all: test
 
@@ -27,6 +30,11 @@ test:
 cover:
 	@echo "Running tests with coverage..."
 	$(GO) test $(PACKAGES) $(TEST_ARGS) $(COVER_ARGS)
+	@echo "Filtering coverage file to exclude examples and main.go..."
+	@if command -v grep > /dev/null && command -v sed > /dev/null; then \
+		grep -v "/example/" coverage.out | grep -v "main.go" > coverage.filtered.out && \
+		mv coverage.filtered.out coverage.out; \
+	fi
 	$(GO) tool cover -func=coverage.out
 
 # Generate HTML coverage report
@@ -98,4 +106,4 @@ docker-logs:
 # Clean up
 clean:
 	@echo "Cleaning up..."
-	rm -f coverage.out coverage.html
+	rm -f coverage.out coverage.html coverage.filtered.out
