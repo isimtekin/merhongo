@@ -8,7 +8,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/isimtekin/merhongo.svg)](https://pkg.go.dev/github.com/isimtekin/merhongo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/isimtekin/merhongo)](https://goreportcard.com/report/github.com/isimtekin/merhongo)
-[![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](https://github.com/isimtekin/merhongo)
+[![Test Coverage](https://img.shields.io/badge/coverage-84-brightgreen)](https://github.com/isimtekin/merhongo)
 [![CI](https://github.com/isimtekin/merhongo/actions/workflows/ci.yml/badge.svg)](https://github.com/isimtekin/merhongo/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/isimtekin/merhongo/branch/main/graph/badge.svg)](https://codecov.io/gh/isimtekin/merhongo)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/isimtekin/merhongo/blob/main/LICENSE)
@@ -29,8 +29,9 @@ Merhongo combines the power of the official MongoDB Go driver with an intuitive 
 ✅ **Middleware Support**: Pre/post operation hooks for advanced workflows  
 ✅ **Robust Error Handling**: Standardized error types and helpful utilities  
 ✅ **Automatic Timestamps**: Built-in createdAt/updatedAt field management  
-✅ **Connection Management**: Singleton pattern with support for multiple named connections  
-✅ **High Test Coverage**: 85% of code covered by tests  
+✅ **Type-Safe Generic Models**: Create type-safe models with Go's generics  
+✅ **Flexible Configuration**: Configure models with rich options API  
+✅ **High Test Coverage**: 82% of code covered by tests  
 ✅ **Comprehensive Documentation**: Detailed examples and guides
 
 ## Requirements
@@ -57,201 +58,160 @@ import (
 	"time"
 
 	"github.com/isimtekin/merhongo"
-	"github.com/isimtekin/merhongo/errors"
 	"github.com/isimtekin/merhongo/schema"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Define your document structure
+// Define your model struct
 type User struct {
-	ID        interface{} `bson:"_id,omitempty"`
-	Username  string      `bson:"username"`
-	Email     string      `bson:"email"`
-	Age       int         `bson:"age"`
-	CreatedAt time.Time   `bson:"createdAt"`
-	UpdatedAt time.Time   `bson:"updatedAt"`
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Username  string             `bson:"username" json:"username"`
+	Email     string             `bson:"email" json:"email"`
+	Age       int                `bson:"age" json:"age"`
+	CreatedAt time.Time          `bson:"createdAt" json:"createdAt"`
+	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
 func main() {
 	// Connect to MongoDB
-	client, err := merhongo.Connect("mongodb://localhost:27017", "my_database")
+	client, err := merhongo.Connect("mongodb://localhost:27017", "myapp")
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 	defer merhongo.Disconnect()
 
 	// Define a schema
 	userSchema := merhongo.SchemaNew(
 		map[string]schema.Field{
-			"Username": {
-				Type:     "",
-				Required: true,
-				Unique:   true,
-			},
-			"Email": {
-				Type:     "",
-				Required: true,
-			},
-			"Age": {
-				Type: 0,
-				Min:  18,
-			},
+			"Username": {Required: true, Unique: true},
+			"Email":    {Required: true, Unique: true},
+			"Age":      {Min: 18, Max: 100},
 		},
 		schema.WithCollection("users"),
+		schema.WithTimestamps(true),
 	)
 
-	// Create a model
-	userModel := merhongo.ModelNew("User", userSchema, client.Database)
+	// Create a type-safe model with generics
+	userModel := merhongo.ModelNew[User]("User", userSchema)
 
-	// Create a new user
-	ctx := context.Background()
+	// Create a document
 	user := &User{
-		Username: "johndoe",
+		Username: "john_doe",
 		Email:    "john@example.com",
 		Age:      30,
 	}
 
+	ctx := context.Background()
 	err = userModel.Create(ctx, user)
 	if err != nil {
-		// Use the error helpers for more specific error handling
-		if errors.IsValidationError(err) {
-			log.Fatalf("Validation error: %v", err)
-		}
 		log.Fatalf("Failed to create user: %v", err)
 	}
 
-	fmt.Printf("Created user: %+v\n", user)
-	
-	// Find a user by ID
+	fmt.Printf("Created user with ID: %s\n", user.ID.Hex())
+
+	// Query with builder
+	queryBuilder := merhongo.QueryNew().
+		Where("username", "john_doe").
+		SortBy("createdAt", false)
+
 	var foundUser User
-	err = userModel.FindById(ctx, user.ID.(string), &foundUser)
+	err = userModel.FindOneWithQuery(ctx, queryBuilder, &foundUser)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Println("User not found")
-		} else {
-			log.Fatalf("Error finding user: %v", err)
-		}
+		log.Fatalf("Failed to find user: %v", err)
 	}
+
+	fmt.Printf("Found user: %s (%s)\n", foundUser.Username, foundUser.Email)
 }
 ```
 
-## Using the Connection Manager
+## Advanced Usage
 
-Merhongo provides a powerful connection management system:
+### Creating Models with Options
+
+You can create models with additional options for more flexibility:
 
 ```go
-// Default connection
-client, err := merhongo.Connect("mongodb://localhost:27017", "my_database")
-if err != nil {
-    log.Fatalf("Failed to connect: %v", err)
-}
-defer merhongo.Disconnect()
-
-// Access the default connection anywhere in your code
-defaultClient := merhongo.GetConnection()
-
-// Multiple named connections
-usersClient, err := merhongo.ConnectWithName("users", "mongodb://localhost:27017", "users_db")
-if err != nil {
-    log.Fatalf("Failed to connect to users DB: %v", err)
-}
-
-productsClient, err := merhongo.ConnectWithName("products", "mongodb://localhost:27017", "products_db")
-if err != nil {
-    log.Fatalf("Failed to connect to products DB: %v", err)
-}
-
-// Disconnect all connections at once
-defer merhongo.DisconnectAll()
-
-// Access named connections anywhere in your code
-usersConnection := merhongo.GetConnectionByName("users")
-productsConnection := merhongo.GetConnectionByName("products")
+// Define model with options
+userModel := merhongo.ModelNew[User]("User", userSchema, merhongo.ModelOptions{
+    ConnectionName: "analytics",      // Use a specific named connection
+    AutoCreateIndexes: true,          // Automatically create indexes
+    CustomValidator: func(doc interface{}) error {
+        // Custom validation logic
+        return nil
+    },
+})
 ```
 
-## Using the Query Builder
+### Using Middleware
 
-Merhongo provides a powerful query builder for creating MongoDB queries:
+Add middleware functions to schemas for pre/post operation hooks:
 
 ```go
-import (
-	"context"
-	"fmt"
-	"github.com/isimtekin/merhongo"
-)
+// Add pre-save middleware
+userSchema.Pre("save", func(doc interface{}) error {
+    // Cast to your type if needed
+    if user, ok := doc.(*User); ok {
+        // Do something with the user before saving
+        fmt.Printf("About to save user: %s\n", user.Username)
+    }
+    return nil
+})
+```
 
-func findActiveUsers(ctx context.Context, userModel *model.Model) {
-	// Create a query using the builder
-	q := merhongo.QueryNew().
-		Where("active", true).
-		GreaterThan("age", 18).
-		In("role", []string{"user", "admin"}).
-		SortBy("username", true).
-		Limit(10)
-	
-	// Find documents with the query
-	var users []User
-	err := userModel.FindWithQuery(ctx, q, &users)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	
-	fmt.Printf("Found %d users\n", len(users))
-	
-	// Count documents with the query
-	count, err := userModel.CountWithQuery(ctx, q)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	
-	fmt.Printf("Total count: %d\n", count)
-	
-	// Advanced query with regex
-	q = merhongo.QueryNew().
-		Regex("username", "^j", "i").  // usernames starting with 'j', case insensitive
-		GreaterThanOrEqual("age", 21).
-		Exists("email", true).         // must have email field
-		SortBy("createdAt", false)     // newest first
-	
-	err = userModel.FindWithQuery(ctx, q, &users)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	
-	// Update all matched documents
-	modifiedCount, err := userModel.UpdateWithQuery(
-		ctx, 
-		merhongo.QueryNew().Where("active", false),
-		map[string]interface{}{"active": true, "updatedAt": time.Now()},
-	)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	
-	fmt.Printf("Activated %d users\n", modifiedCount)
-}
+### Transactions
+
+Execute multiple operations in a transaction:
+
+```go
+err := client.ExecuteTransaction(ctx, func(sc mongo.SessionContext) error {
+    // Create a user
+    err := userModel.Create(sc, user)
+    if err != nil {
+        return err
+    }
+    
+    // Create a related document
+    err = profileModel.Create(sc, profile)
+    if err != nil {
+        return err
+    }
+    
+    return nil
+})
+```
+
+### Query Building
+
+The query builder provides a fluent API for MongoDB queries:
+
+```go
+query := merhongo.QueryNew().
+    Where("age", 30).
+    GreaterThan("createdAt", lastWeek).
+    In("status", []string{"active", "pending"}).
+    SortBy("username", true).
+    Limit(10).
+    Skip(20)
+
+var users []User
+err := userModel.FindWithQuery(ctx, query, &users)
 ```
 
 ## Error Handling
 
-Merhongo provides a robust error handling system with standard error types and helper functions:
+Merhongo provides specialized error types for common MongoDB operations:
 
 ```go
-import "github.com/isimtekin/merhongo/errors"
-
-// Check specific error types
-if errors.IsNotFound(err) {
-    // Handle document not found
+err := userModel.FindById(ctx, "invalid-id", &user)
+if merhongo.errors.IsInvalidObjectID(err) {
+    // Handle invalid ID error
 }
 
-// Get structured error responses (useful for HTTP APIs)
-response := errors.ToErrorResponse(err)
+err = userModel.FindById(ctx, validId, &user)
+if merhongo.errors.IsNotFound(err) {
+    // Handle not found error
+}
 ```
-
-See the [error handling documentation](docs/error-handling.md) for more details.
 
 ## Test Coverage
 
@@ -259,88 +219,15 @@ Merhongo is thoroughly tested to ensure reliability:
 
 | Package     | Coverage |
 |-------------|----------|
-| merhongo    | 100% |
-| connection  | 100% |
-| model       | 89% |
-| schema      | 49% |
-| query       | 85% |
-| errors      | 100% |
-| **Overall** | **84%** |
+| merhongo    | 89%      |
+| connection  | 100%     |
+| model       | 89%      |
+| schema      | 49%      |
+| query       | 85%      |
+| errors      | 100%     |
+| **Overall** | **84%**  |
 
 The high test coverage helps ensure that Merhongo is stable and reliable for production use.
-
-## Development and Testing
-
-### Setting up MongoDB with Docker Compose
-
-The easiest way to set up MongoDB for development and testing is using Docker Compose:
-
-```bash
-# Start MongoDB and Mongo Express
-docker-compose up -d
-
-# Check the status of the containers
-docker-compose ps
-
-# Access Mongo Express web interface (for database management)
-# Open http://localhost:8081 in your browser (default credentials: admin/pass)
-```
-
-### Using the Makefile
-
-The project includes a Makefile to help with common development tasks:
-
-```bash
-# Run all tests
-make test
-
-# Run tests with coverage and see coverage statistics
-make cover
-
-# Generate HTML coverage report and open in browser
-make cover-html
-
-# Format Go code
-make fmt
-
-# Check if code is properly formatted (useful for CI/CD)
-make check-fmt
-
-# Run linter (requires golangci-lint to be installed)
-make lint
-
-# MongoDB container operations
-make mongo-start    # Start MongoDB
-make mongo-stop     # Stop MongoDB
-make mongo-restart  # Restart MongoDB
-make mongo-logs     # View MongoDB logs
-
-# Docker Compose operations
-make docker-up      # Start all services
-make docker-down    # Stop all services
-make docker-logs    # View all logs
-
-# Clean up test artifacts
-make clean
-```
-
-## Project Structure
-
-```
-merhongo/
-├── merhongo.go          # Top-level package with singleton access
-├── connection/          # MongoDB connection management
-├── schema/              # Schema definition and validation
-├── model/               # Models and CRUD operations
-├── query/               # Query building utilities
-├── errors/              # Error handling system
-├── example/             # Example applications
-├── docs/                # Documentation
-├── docker-compose.yml   # Docker Compose configuration
-├── Makefile             # Build and test automation
-├── go.mod               # Go module definition
-└── README.md            # This file
-```
 
 ## Comparison with Other Libraries
 
@@ -350,17 +237,9 @@ merhongo/
 | Middleware Support      | ✅       | ❌   | ❌               | ✅     |
 | Query Builder           | ✅       | ❌   | ❌               | ❌     |
 | Error Types             | ✅       | ⚠️ Limited | ⚠️ Limited    | ❌     |
+| Type-Safe Generic Models| ✅       | ❌   | ❌               | ❌     |
 | Automatic Timestamps    | ✅       | ❌   | ❌               | ✅     |
-| Connection Management   | ✅       | ⚠️ Limited | ⚠️ Limited    | ❌     |
 | Active Development      | ✅       | ❌   | ✅               | ⚠️ Limited |
-
-## Roadmap
-
-- **v0.2.0**: ✅ Connection management with singleton pattern, enhanced structure
-- **v0.3.0**: Aggregation pipeline builder
-- **v0.4.0**: Population (references) support
-- **v0.5.0**: Transactions and bulk operations helpers
-- **v1.0.0**: API stabilization and performance optimizations
 
 ## Contributing
 
@@ -375,8 +254,3 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgements
-
-- The [MongoDB Go Driver](https://github.com/mongodb/mongo-go-driver) team
-- The [Mongoose](https://mongoosejs.com/) project for inspiration

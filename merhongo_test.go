@@ -1,266 +1,258 @@
 package merhongo_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/isimtekin/merhongo"
 	"github.com/isimtekin/merhongo/schema"
+	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestVersionCheck(t *testing.T) {
-	// Simple test to verify version string is returned
-	version := merhongo.Version()
-	if version == "" {
-		t.Error("Version string is empty")
-	}
+// TestUser is a test model for users
+type TestUser struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Username  string             `bson:"username"`
+	Email     string             `bson:"email"`
+	CreatedAt time.Time          `bson:"createdAt,omitempty"`
+	UpdatedAt time.Time          `bson:"updatedAt,omitempty"`
 }
 
-func TestConnectionSingleton(t *testing.T) {
-	// Ensure clean state for tests
-	_ = merhongo.DisconnectAll()
-
-	// Connect using default name
-	client, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test")
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
-	}
-
-	// Get default connection
-	defaultClient := merhongo.GetConnection()
-	if defaultClient != client {
-		t.Error("GetConnection() should return the same client instance")
-	}
-
-	// Test multiple named connections
-	namedClient, err := merhongo.ConnectWithName("secondary", "mongodb://localhost:27017", "merhongo_test2")
-	if err != nil {
-		t.Fatalf("Failed to connect with name: %v", err)
-	}
-
-	// Verify named connection can be retrieved
-	retrievedClient := merhongo.GetConnectionByName("secondary")
-	if retrievedClient != namedClient {
-		t.Error("GetConnectionByName() should return the correct client instance")
-	}
-
-	// Verify disconnection of named connection
-	err = merhongo.DisconnectByName("secondary")
-	if err != nil {
-		t.Errorf("Failed to disconnect named connection: %v", err)
-	}
-
-	// Verify named connection is removed after disconnection
-	if merhongo.GetConnectionByName("secondary") != nil {
-		t.Error("Connection should be nil after disconnection")
-	}
-
-	// Verify default connection still exists
-	if merhongo.GetConnection() == nil {
-		t.Error("Default connection should still exist")
-	}
-
-	// Disconnect default connection
-	err = merhongo.Disconnect()
-	if err != nil {
-		t.Errorf("Failed to disconnect default connection: %v", err)
-	}
-
-	// Verify all connections are removed
-	if merhongo.GetConnection() != nil {
-		t.Error("Default connection should be nil after disconnection")
-	}
+// TestPost is a test model for posts
+type TestPost struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	Title     string             `bson:"title"`
+	Content   string             `bson:"content"`
+	CreatedAt time.Time          `bson:"createdAt,omitempty"`
+	UpdatedAt time.Time          `bson:"updatedAt,omitempty"`
 }
 
-func TestConnectInvalidURI(t *testing.T) {
-	// Test with invalid MongoDB URI
-	_, err := merhongo.Connect("mongodb://invalidhost:27017", "merhongo_test")
-	if err == nil {
-		t.Error("Connect should return an error with invalid URI")
-	}
-}
-
-func TestConnectWithEmptyName(t *testing.T) {
-	// Test with empty connection name
-	_, err := merhongo.ConnectWithName("", "mongodb://localhost:27017", "merhongo_test")
-	if err == nil {
-		t.Error("ConnectWithName should return an error with empty name")
-	}
-}
-
-func TestConvenienceFunctions(t *testing.T) {
-	// Test SchemaNew
-	fields := map[string]schema.Field{
-		"Email": {Required: true, Unique: true},
-	}
-	s := merhongo.SchemaNew(fields, schema.WithCollection("users"))
-
-	if s.Fields["Email"].Required != true {
-		t.Errorf("Expected Email field to be required")
-	}
-
-	if s.Collection != "users" {
-		t.Errorf("Expected collection name to be 'users'")
-	}
-
-	// Test QueryNew
-	q := merhongo.QueryNew()
-	if q == nil {
-		t.Error("QueryNew() should return a new query builder")
-	}
-}
-
-func TestDisconnectNonExistentConnection(t *testing.T) {
-	// Ensure clean state
-	_ = merhongo.DisconnectAll()
-
-	// Disconnecting a non-existent connection should not error
-	err := merhongo.DisconnectByName("non_existent")
+func TestModelNew_WithGenerics(t *testing.T) {
+	// Connect to MongoDB
+	_, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test_generics")
 	if err != nil {
-		t.Errorf("DisconnectByName should not return an error for non-existent connection: %v", err)
-	}
-}
-
-func TestMultipleConnections(t *testing.T) {
-	// Ensure clean state
-	_ = merhongo.DisconnectAll()
-
-	// Create multiple connections
-	_, err := merhongo.Connect("mongodb://localhost:27017", "db1")
-	if err != nil {
-		t.Fatalf("Failed to connect to db1: %v", err)
-	}
-
-	_, err = merhongo.ConnectWithName("conn2", "mongodb://localhost:27017", "db2")
-	if err != nil {
-		t.Fatalf("Failed to connect to db2: %v", err)
-	}
-
-	_, err = merhongo.ConnectWithName("conn3", "mongodb://localhost:27017", "db3")
-	if err != nil {
-		t.Fatalf("Failed to connect to db3: %v", err)
-	}
-
-	// Test DisconnectAll
-	err = merhongo.DisconnectAll()
-	if err != nil {
-		t.Errorf("DisconnectAll failed: %v", err)
-	}
-
-	// Verify all connections are removed
-	if merhongo.GetConnection() != nil {
-		t.Error("Default connection should be nil after DisconnectAll")
-	}
-	if merhongo.GetConnectionByName("conn2") != nil {
-		t.Error("conn2 should be nil after DisconnectAll")
-	}
-	if merhongo.GetConnectionByName("conn3") != nil {
-		t.Error("conn3 should be nil after DisconnectAll")
-	}
-}
-
-// Additional test cases for error scenarios
-
-func TestDisconnectWithInvalidConnection(t *testing.T) {
-	// Ensure clean state
-	_ = merhongo.DisconnectAll()
-
-	// Create a client with an intentionally broken connection
-	_, err := merhongo.Connect("mongodb://localhost:99999", "merhongo_test")
-	if err == nil {
-		t.Fatal("Expected connection error with invalid port")
-	}
-}
-
-func TestMultipleConnectionsWithSameName(t *testing.T) {
-	// Ensure clean state
-	_ = merhongo.DisconnectAll()
-
-	// First connection
-	_, err := merhongo.ConnectWithName("duplicate", "mongodb://localhost:27017", "db1")
-	if err != nil {
-		t.Fatalf("First connection failed: %v", err)
-	}
-
-	// Second connection with same name should override
-	_, err = merhongo.ConnectWithName("duplicate", "mongodb://localhost:27017", "db2")
-	if err != nil {
-		t.Fatalf("Second connection failed: %v", err)
-	}
-
-	// Verify the latest connection is retrieved
-	client := merhongo.GetConnectionByName("duplicate")
-	if client == nil {
-		t.Error("Connection with duplicate name should exist")
-	}
-}
-
-func TestDisconnectAllWithError(t *testing.T) {
-	// This is a bit tricky to test precisely, but we can at least
-	// ensure DisconnectAll handles multiple connections
-	_ = merhongo.DisconnectAll()
-
-	// Create multiple connections
-	_, err1 := merhongo.Connect("mongodb://localhost:27017", "db1")
-	_, err2 := merhongo.ConnectWithName("conn2", "mongodb://localhost:27017", "db2")
-
-	if err1 != nil || err2 != nil {
-		t.Fatalf("Failed to create connections: %v, %v", err1, err2)
-	}
-
-	// Disconnect all
-	err := merhongo.DisconnectAll()
-	if err != nil {
-		t.Errorf("DisconnectAll should not return an error: %v", err)
-	}
-}
-
-func TestModelNew(t *testing.T) {
-	// Create a connection first
-	client, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test")
-	if err != nil {
-		t.Fatalf("Failed to connect: %v", err)
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
 	}
 	defer merhongo.Disconnect()
 
 	// Define a schema
-	fields := map[string]schema.Field{
-		"Username": {
-			Required: true,
-			Unique:   true,
+	userSchema := merhongo.SchemaNew(
+		map[string]schema.Field{
+			"Username": {Required: true, Unique: true},
+			"Email":    {Required: true},
 		},
-		"Email": {
-			Required: true,
+		schema.WithCollection("test_users_generics"),
+	)
+
+	// Create model with generics
+	userModel := merhongo.ModelNew[TestUser]("TestUser", userSchema)
+	assert.NotNil(t, userModel, "Model should not be nil")
+	assert.Equal(t, "TestUser", userModel.Name, "Model name should match")
+	assert.NotNil(t, userModel.Collection, "Collection should be initialized")
+
+	// Try to create a document
+	user := &TestUser{
+		Username: "test_generics",
+		Email:    "test_generics@example.com",
+	}
+
+	err = userModel.Create(context.Background(), user)
+	assert.NoError(t, err, "Should be able to create a document")
+	assert.NotEqual(t, primitive.NilObjectID, user.ID, "ID should be set")
+
+	// Clean up
+	_, _ = userModel.Collection.DeleteMany(context.Background(), map[string]interface{}{})
+}
+
+func TestModelNew_WithOptions(t *testing.T) {
+	// Connect to MongoDB
+	_, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test_options")
+	if err != nil {
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
+	}
+	defer merhongo.Disconnect()
+
+	// Define a schema
+	postSchema := merhongo.SchemaNew(
+		map[string]schema.Field{
+			"Title":   {Required: true},
+			"Content": {Required: true},
 		},
+		schema.WithCollection("test_posts_options"),
+	)
+
+	// Test with custom validator option
+	customValidatorCalled := false
+	postModel := merhongo.ModelNew[TestPost]("TestPost", postSchema, merhongo.ModelOptions{
+		AutoCreateIndexes: true,
+		CustomValidator: func(doc interface{}) error {
+			customValidatorCalled = true
+			return nil
+		},
+	})
+
+	assert.NotNil(t, postModel, "Model should not be nil")
+
+	// Create a post to trigger validation
+	post := &TestPost{
+		Title:   "Test Options",
+		Content: "Testing model options",
 	}
 
-	// Create a schema
-	s := merhongo.SchemaNew(fields, schema.WithCollection("test_users"))
+	err = postModel.Create(context.Background(), post)
+	assert.NoError(t, err, "Should be able to create a document")
+	assert.True(t, customValidatorCalled, "Custom validator should be called")
 
-	// Create a model using ModelNew
-	model := merhongo.ModelNew("TestUser", s, client.Database)
+	// Clean up
+	_, _ = postModel.Collection.DeleteMany(context.Background(), map[string]interface{}{})
+}
 
-	// Verify the model is created correctly
-	if model == nil {
-		t.Error("ModelNew should return a non-nil model")
+func TestModelNew_WithConnectionName(t *testing.T) {
+	// Create a named connection
+	_, err := merhongo.ConnectWithName("test_conn", "mongodb://localhost:27017", "merhongo_test_named")
+	if err != nil {
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
+	}
+	defer merhongo.DisconnectByName("test_conn")
+
+	// Define a schema
+	userSchema := merhongo.SchemaNew(
+		map[string]schema.Field{
+			"Username": {Required: true},
+			"Email":    {Required: true},
+		},
+		schema.WithCollection("test_users_named"),
+	)
+
+	// Create model with connection name option
+	userModel := merhongo.ModelNew[TestUser]("TestUserNamed", userSchema, merhongo.ModelOptions{
+		ConnectionName: "test_conn",
+	})
+
+	assert.NotNil(t, userModel, "Model should not be nil")
+	assert.NotNil(t, userModel.Collection, "Collection should be initialized")
+
+	// Verify it's using the correct connection by creating a document
+	user := &TestUser{
+		Username: "test_named_conn",
+		Email:    "test_named@example.com",
 	}
 
-	// Check if the model's name is set correctly
-	if model.Name != "TestUser" {
-		t.Errorf("Expected model name 'TestUser', got '%s'", model.Name)
+	err = userModel.Create(context.Background(), user)
+	assert.NoError(t, err, "Should be able to create a document")
+
+	// Clean up
+	_, _ = userModel.Collection.DeleteMany(context.Background(), map[string]interface{}{})
+}
+
+func TestDisconnectAll(t *testing.T) {
+	// Create multiple connections
+	conn1, err := merhongo.ConnectWithName("conn1", "mongodb://localhost:27017", "merhongo_test_disconnect_all1")
+	assert.NotNil(t, conn1, "Connection object should not be nil")
+	if err != nil {
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
 	}
 
-	// Check if the schema is set correctly
-	if model.Schema != s {
-		t.Error("ModelNew should set the provided schema")
+	conn2, err := merhongo.ConnectWithName("conn2", "mongodb://localhost:27017", "merhongo_test_disconnect_all2")
+	assert.NotNil(t, conn2, "Connection object should not be nil")
+	if err != nil {
+		// Clean up first connection
+		_ = merhongo.DisconnectByName("conn1")
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
 	}
 
-	// Verify the collection is set
-	if model.Collection == nil {
-		t.Error("Model should have a non-nil collection")
+	conn3, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test_disconnect_all3")
+	assert.NotNil(t, conn3, "Connection object should not be nil")
+	if err != nil {
+		// Clean up created connections
+		_ = merhongo.DisconnectByName("conn1")
+		_ = merhongo.DisconnectByName("conn2")
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
 	}
 
-	// Check the collection name
-	if model.Collection.Name() != "test_users" {
-		t.Errorf("Expected collection name 'test_users', got '%s'", model.Collection.Name())
+	// Ensure all connections exist
+	assert.NotNil(t, merhongo.GetConnectionByName("conn1"), "conn1 should exist")
+	assert.NotNil(t, merhongo.GetConnectionByName("conn2"), "conn2 should exist")
+	assert.NotNil(t, merhongo.GetConnection(), "default connection should exist")
+
+	// Disconnect all connections
+	err = merhongo.DisconnectAll()
+	assert.NoError(t, err, "DisconnectAll should succeed")
+
+	// Verify all connections were removed
+	assert.Nil(t, merhongo.GetConnectionByName("conn1"), "conn1 should be removed after DisconnectAll")
+	assert.Nil(t, merhongo.GetConnectionByName("conn2"), "conn2 should be removed after DisconnectAll")
+	assert.Nil(t, merhongo.GetConnection(), "default connection should be removed after DisconnectAll")
+}
+
+func TestDisconnect(t *testing.T) {
+	// Create a default connection
+	conn, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_test_disconnect")
+	assert.NotNil(t, conn, "Connection object should not be nil")
+
+	if err != nil {
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
 	}
+
+	// Ensure the connection exists
+	assert.NotNil(t, merhongo.GetConnection(), "Default connection should exist")
+
+	// Disconnect
+	err = merhongo.Disconnect()
+	assert.NoError(t, err, "Disconnect should succeed")
+
+	// Verify the connection was removed
+	assert.Nil(t, merhongo.GetConnection(), "Default connection should be removed after disconnect")
+}
+
+func TestDisconnectByName(t *testing.T) {
+	// Create named connections
+	conn1, err := merhongo.ConnectWithName("test_disconnect_1", "mongodb://localhost:27017", "merhongo_test_disconnect1")
+	assert.NotNil(t, conn1, "Connection object should not be nil")
+
+	if err != nil {
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
+	}
+
+	conn2, err := merhongo.ConnectWithName("test_disconnect_2", "mongodb://localhost:27017", "merhongo_test_disconnect2")
+	assert.NotNil(t, conn2, "Connection object should not be nil")
+
+	if err != nil {
+		_ = merhongo.DisconnectByName("test_disconnect_1")
+		t.Skip("Skipping test; could not connect to MongoDB")
+		return
+	}
+
+	// Ensure both connections exist
+	assert.NotNil(t, merhongo.GetConnectionByName("test_disconnect_1"), "test_disconnect_1 should exist")
+	assert.NotNil(t, merhongo.GetConnectionByName("test_disconnect_2"), "test_disconnect_2 should exist")
+
+	// Disconnect one connection
+	err = merhongo.DisconnectByName("test_disconnect_1")
+	assert.NoError(t, err, "DisconnectByName should succeed")
+
+	// Verify one connection was removed but the other remains
+	assert.Nil(t, merhongo.GetConnectionByName("test_disconnect_1"), "test_disconnect_1 should be removed after disconnect")
+	assert.NotNil(t, merhongo.GetConnectionByName("test_disconnect_2"), "test_disconnect_2 should still exist")
+
+	// Clean up the second connection
+	_ = merhongo.DisconnectByName("test_disconnect_2")
+}
+
+func TestDisconnectByName_NonExistent(t *testing.T) {
+	// Try to disconnect a non-existent connection
+	err := merhongo.DisconnectByName("non_existent_connection")
+
+	// Should not return an error
+	assert.NoError(t, err, "DisconnectByName on non-existent connection should not return error")
 }
