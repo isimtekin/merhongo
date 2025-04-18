@@ -40,6 +40,9 @@ func main() {
 
 	// Example 2: Using multiple connections
 	multiConnectionExample()
+
+	// Example 3: Using new generic models with options
+	genericModelExample()
 }
 
 func basicExample() {
@@ -97,8 +100,10 @@ func basicExample() {
 		return nil
 	})
 
-	// Create a model
-	userModel := merhongo.ModelNew("User", userSchema, client.Database)
+	// Create a model (legacy style)
+	userModel := merhongo.ModelNew[User]("User", userSchema, merhongo.ModelOptions{
+		Database: client.Database,
+	})
 
 	// Create a new user
 	ctx := context.Background()
@@ -161,12 +166,12 @@ func multiConnectionExample() {
 	fmt.Println("\n=== Multiple Connections Example ===")
 
 	// Connect to multiple databases
-	usersClient, err := merhongo.ConnectWithName("users", "mongodb://localhost:27017", "users_db")
+	_, err := merhongo.ConnectWithName("users", "mongodb://localhost:27017", "users_db")
 	if err != nil {
 		log.Fatalf("Failed to connect to users DB: %v", err)
 	}
 
-	productsClient, err := merhongo.ConnectWithName("products", "mongodb://localhost:27017", "products_db")
+	_, err = merhongo.ConnectWithName("products", "mongodb://localhost:27017", "products_db")
 	if err != nil {
 		log.Fatalf("Failed to connect to products DB: %v", err)
 	}
@@ -189,9 +194,14 @@ func multiConnectionExample() {
 		schema.WithCollection("products"),
 	)
 
-	// Create models with specific connections
-	userModel := merhongo.ModelNew("User", userSchema, usersClient.Database)
-	productModel := merhongo.ModelNew("Product", productSchema, productsClient.Database)
+	// Create models with specific connections using connection names
+	userModel := merhongo.ModelNew[User]("User", userSchema, merhongo.ModelOptions{
+		ConnectionName: "users",
+	})
+
+	productModel := merhongo.ModelNew[Product]("Product", productSchema, merhongo.ModelOptions{
+		ConnectionName: "products",
+	})
 
 	// Use models with different connections
 	ctx := context.Background()
@@ -253,6 +263,80 @@ func multiConnectionExample() {
 		log.Fatal("Failed to get products connection")
 	}
 	fmt.Println("Successfully retrieved products connection")
+}
+
+// New example showcasing generic models with options
+func genericModelExample() {
+	fmt.Println("\n=== Generic Model Example with Options ===")
+
+	// Connect to MongoDB
+	_, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_generic_example")
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+	}
+	defer merhongo.Disconnect()
+
+	// Define schemas
+	productSchema := merhongo.SchemaNew(
+		map[string]schema.Field{
+			"Name":  {Required: true},
+			"Price": {Required: true, Min: 0},
+		},
+		schema.WithCollection("advanced_products"),
+	)
+
+	// Create model with type safety and custom validator
+	validationCalled := false
+
+	productModel := merhongo.ModelNew[Product]("AdvancedProduct", productSchema, merhongo.ModelOptions{
+		AutoCreateIndexes: true,
+		CustomValidator: func(doc interface{}) error {
+			product, ok := doc.(*Product)
+			if !ok {
+				return fmt.Errorf("document is not a Product")
+			}
+
+			// Custom validation logic
+			if product.Price <= 0 {
+				return fmt.Errorf("price must be positive")
+			}
+
+			validationCalled = true
+			return nil
+		},
+	})
+
+	// Use the model
+	ctx := context.Background()
+
+	// Create a product with the generic model
+	product := &Product{
+		Name:        "Luxury Watch",
+		Description: "Premium timepiece",
+		Price:       1299.99,
+		InStock:     true,
+	}
+
+	err = productModel.Create(ctx, product)
+	if err != nil {
+		log.Fatalf("Failed to create product: %v", err)
+	}
+
+	fmt.Printf("Created product with generic model: %+v\n", product)
+	fmt.Printf("Custom validator was called: %v\n", validationCalled)
+
+	// Query using the type-safe model
+	var products []Product
+	err = productModel.FindWithQuery(
+		ctx,
+		query.New().GreaterThan("price", 1000),
+		&products,
+	)
+	if err != nil {
+		log.Fatalf("Error querying products: %v", err)
+	}
+
+	fmt.Printf("Found %d premium products\n", len(products))
 }
 
 // Helper function to check if a string contains another string

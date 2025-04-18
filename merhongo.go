@@ -109,19 +109,79 @@ func SchemaNew(fields map[string]schema.Field, options ...schema.Option) *schema
 	return schema.New(fields, options...)
 }
 
+// ModelOptions contains optional settings for model creation
+type ModelOptions struct {
+	// Database is the MongoDB database to use, if nil the default connection database is used
+	Database *mongo.Database
+	// ConnectionName specifies a named connection to use if Database is nil
+	ConnectionName string
+	// AutoCreateIndexes determines if indexes should be created automatically
+	AutoCreateIndexes bool
+	// CustomValidator can override the default document validator
+	CustomValidator func(interface{}) error
+}
+
 // ModelNew is a convenience function to create a new model.
-// It's a simple wrapper around model.New.
-func ModelNew(name string, schema *schema.Schema, db *mongo.Database) *model.Model {
-	return model.New(name, schema, db)
+// It accepts the model struct type as a generic parameter.
+// If no database is specified in options, it uses the default client's database.
+func ModelNew[T any](name string, schema *schema.Schema, options ...ModelOptions) *model.Model {
+	// Default options
+	opts := ModelOptions{
+		AutoCreateIndexes: true,
+	}
+
+	// Apply provided options if any
+	if len(options) > 0 {
+		opts = options[0]
+	}
+
+	// Determine which database to use
+	var db *mongo.Database
+	if opts.Database != nil {
+		// Use explicitly provided database
+		db = opts.Database
+	} else if opts.ConnectionName != "" {
+		// Use database from specified connection
+		client := GetConnectionByName(opts.ConnectionName)
+		if client != nil {
+			db = client.Database
+		}
+	} else {
+		// Use default connection's database
+		defaultClient := GetConnection()
+		if defaultClient != nil {
+			db = defaultClient.Database
+		}
+	}
+
+	// Create the model
+	m := model.New(name, schema, db)
+
+	// Apply custom validator if provided
+	if opts.CustomValidator != nil && m.Schema != nil {
+		m.Schema.CustomValidator = opts.CustomValidator
+	}
+
+	// Register the type with the model if we have a valid connection
+	var modelType T
+
+	// Find if we have a connection client that implements RegisterModel
+	if db != nil {
+		// Check if the db belongs to our own connection.Client
+		// (We can't directly cast mongo.Client to connection.Client)
+		for _, client := range connections {
+			if client.Database == db {
+				client.RegisterModel(name, &modelType)
+				break
+			}
+		}
+	}
+
+	return m
 }
 
 // QueryNew is a convenience function to create a new query builder.
 // It's a simple wrapper around query.New.
 func QueryNew() *query.Builder {
 	return query.New()
-}
-
-// Version returns the current version of the merhongo package.
-func Version() string {
-	return "0.2.0"
 }
