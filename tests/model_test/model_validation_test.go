@@ -40,11 +40,11 @@ func TestValidateDocumentCalls(t *testing.T) {
 		UpdatedAt time.Time          `bson:"updatedAt,omitempty"`
 	}
 
-	// Create schema with validation requirements
+	// Create schema with validation requirements - use lowercase to match bson tag
 	s := schema.New(
 		map[string]schema.Field{
-			"Name": {Required: true},
-			"Age":  {Min: 18, Max: 100},
+			"name": {Required: true},
+			"age":  {Min: 18, Max: 100},
 		},
 		schema.WithCollection(collName),
 		schema.WithTimestamps(true),
@@ -301,12 +301,12 @@ func TestCustomValidatorBehavior(t *testing.T) {
 		Type  string             `bson:"type"`
 	}
 
-	// Create schema
+	// Create schema - use lowercase to match bson tag
 	s := schema.New(
 		map[string]schema.Field{
-			"Key":   {Required: true},
-			"Value": {Required: true},
-			"Type":  {Required: true},
+			"key":   {Required: true},
+			"value": {Required: true},
+			"type":  {Required: true},
 		},
 		schema.WithCollection(collName),
 	)

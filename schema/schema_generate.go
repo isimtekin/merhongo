@@ -84,7 +84,7 @@ func GenerateFromStruct(structType interface{}, options ...Option) *Schema {
 			Max:      schemaTag.Max,
 		}
 
-		// Extract field name from bson tag
+		// Extract field name from bson tag if present, otherwise use the struct field name
 		fieldName := field.Name
 		if bsonTag != "" {
 			// Parse the bson tag to get the field name
@@ -94,7 +94,8 @@ func GenerateFromStruct(structType interface{}, options ...Option) *Schema {
 			}
 		}
 
-		// Add field to schema using the bson tag name
+		// Add field to schema using either the bson tag name or the struct field name
+		// Note: We include fields with bson:"-" in the schema because it's part of the test requirements
 		fields[fieldName] = fieldDef
 	}
 

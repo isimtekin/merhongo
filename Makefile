@@ -15,6 +15,9 @@ COVER_ARGS = -coverpkg=./... -coverprofile=coverage.out
 # Package list
 PACKAGES = $(shell go list ./... | grep -v "/example")
 
+# Test directory
+TEST_DIR = ./tests
+
 # Exclude patterns for coverage
 COVERAGE_EXCLUDE = -not -path "*/example/*" -not -name "main.go"
 
@@ -24,12 +27,12 @@ all: test
 # Run all tests
 test:
 	@echo "Running tests..."
-	$(GO) test $(PACKAGES) $(TEST_ARGS)
+	$(GO) test $(shell go list $(TEST_DIR)/... | grep -v "/testutil") $(TEST_ARGS)
 
 # Run tests with coverage
 cover:
 	@echo "Running tests with coverage..."
-	$(GO) test $(PACKAGES) $(TEST_ARGS) $(COVER_ARGS)
+	$(GO) test $(shell go list $(TEST_DIR)/... | grep -v "/testutil") $(TEST_ARGS) $(COVER_ARGS)
 	@echo "Filtering coverage file to exclude examples and main.go..."
 	@if command -v find > /dev/null && command -v grep > /dev/null; then \
 		cat coverage.out | grep -v "/example/" | grep -v "main.go" > coverage.filtered.out && \

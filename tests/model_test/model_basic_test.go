@@ -29,9 +29,10 @@ func TestUserModel_CreateAndFindOne(t *testing.T) {
 	// Test with regular model
 	userSchema := schema.New(
 		map[string]schema.Field{
-			"Username": {Required: true, Unique: true},
-			"Email":    {Required: true, Unique: true},
-			"Age":      {Min: 18, Max: 100},
+			// Use lowercase field names to match bson tags
+			"username": {Required: true, Unique: true},
+			"email":    {Required: true, Unique: true},
+			"age":      {Min: 18, Max: 100},
 		},
 		schema.WithCollection("users_basic"),
 	)
@@ -63,9 +64,10 @@ func TestUserModel_CreateAndFindOne(t *testing.T) {
 	// Test with generic model - use a different collection to avoid conflicts
 	genericSchema := schema.New(
 		map[string]schema.Field{
-			"Username": {Required: true, Unique: true},
-			"Email":    {Required: true, Unique: true},
-			"Age":      {Min: 18, Max: 100},
+			// Use lowercase field names to match bson tags
+			"username": {Required: true, Unique: true},
+			"email":    {Required: true, Unique: true},
+			"age":      {Min: 18, Max: 100},
 		},
 		schema.WithCollection("users_generic"),
 	)
@@ -124,8 +126,9 @@ func TestGenericModel_CRUDOperations(t *testing.T) {
 	testutil.DropCollection(t, client.Database, collName) // Clean up
 
 	userSchema := schema.New(map[string]schema.Field{
-		"Username": {Required: true, Unique: true},
-		"Age":      {Min: 0},
+		// Use lowercase field names to match bson tags
+		"username": {Required: true, Unique: true},
+		"age":      {Min: 0},
 	}, schema.WithCollection(collName))
 
 	userModel := model.NewGeneric[testutil.TestUser]("User", userSchema, client.Database)
@@ -188,7 +191,7 @@ func TestModel_Create_WithMiddlewareError(t *testing.T) {
 	}
 
 	s := schema.New(map[string]schema.Field{
-		"Name": {Required: true},
+		"name": {Required: true},
 	}, schema.WithCollection(collName))
 
 	// Add middleware that always fails
@@ -227,7 +230,7 @@ func TestGenericModel_Create_WithValidationError(t *testing.T) {
 	}
 
 	s := schema.New(map[string]schema.Field{
-		"Name": {Required: true},
+		"name": {Required: true},
 	}, schema.WithCollection(collName))
 
 	// Override validation temporarily
@@ -323,11 +326,12 @@ func TestBasicPartialUpdate(t *testing.T) {
 
 	// Create schema and model
 	userSchema := schema.New(map[string]schema.Field{
-		"Username": {Required: true, Type: ""},
-		"Email":    {Required: true, Type: ""},
-		"Age":      {Min: 0},
-		"Active":   {Type: true},
-		"Role":     {Type: ""},
+		// Use lowercase field names to match bson tags
+		"username": {Required: true, Type: ""},
+		"email":    {Required: true, Type: ""},
+		"age":      {Min: 0},
+		"active":   {Type: true},
+		"role":     {Type: ""},
 	}, schema.WithCollection(collName), schema.WithTimestamps(true))
 
 	userModel := model.NewGeneric[testutil.TestUser]("BasicPartialUser", userSchema, client.Database)
@@ -373,11 +377,12 @@ func TestMultiFieldUpdate(t *testing.T) {
 
 	// Create schema and model
 	userSchema := schema.New(map[string]schema.Field{
-		"Username": {Required: true, Type: ""},
-		"Email":    {Required: true, Type: ""},
-		"Age":      {Min: 0},
-		"Active":   {Type: true},
-		"Role":     {Type: ""},
+		// Use lowercase field names to match bson tags
+		"username": {Required: true, Type: ""},
+		"email":    {Required: true, Type: ""},
+		"age":      {Min: 0},
+		"active":   {Type: true},
+		"role":     {Type: ""},
 	}, schema.WithCollection(collName), schema.WithTimestamps(true))
 
 	userModel := model.NewGeneric[testutil.TestUser]("MultiFieldUser", userSchema, client.Database)
@@ -426,11 +431,12 @@ func TestQueryUpdate(t *testing.T) {
 
 	// Create schema and model
 	userSchema := schema.New(map[string]schema.Field{
-		"Username": {Required: true, Type: ""},
-		"Email":    {Required: true, Type: ""},
-		"Age":      {Min: 0},
-		"Active":   {Type: true},
-		"Role":     {Type: ""},
+		// Use lowercase field names to match bson tags
+		"username": {Required: true, Type: ""},
+		"email":    {Required: true, Type: ""},
+		"age":      {Min: 0},
+		"active":   {Type: true},
+		"role":     {Type: ""},
 	}, schema.WithCollection(collName), schema.WithTimestamps(true))
 
 	userModel := model.NewGeneric[testutil.TestUser]("QueryUser", userSchema, client.Database)
@@ -495,9 +501,10 @@ func TestEmptyValueUpdate(t *testing.T) {
 
 	// Create schema and model
 	userSchema := schema.New(map[string]schema.Field{
-		"Username": {Required: true, Type: ""},
-		"Email":    {Required: true, Type: ""},
-		"Role":     {Type: ""}, // Not required
+		// Use lowercase field names to match bson tags
+		"username": {Required: true, Type: ""},
+		"email":    {Required: true, Type: ""},
+		"role":     {Type: ""}, // Not required
 	}, schema.WithCollection(collName))
 
 	userModel := model.NewGeneric[testutil.TestUser]("EmptyValueUser", userSchema, client.Database)

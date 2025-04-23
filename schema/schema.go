@@ -96,7 +96,6 @@ func (s *Schema) ValidateDocument(doc interface{}) error {
 }
 
 // defaultValidation performs basic validation based on schema rules
-// defaultValidation performs basic validation based on schema rules
 func (s *Schema) defaultValidation(doc interface{}) error {
 	val := reflect.ValueOf(doc)
 	if val.Kind() == reflect.Ptr {
@@ -108,8 +107,10 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 		return errors.WithDetails(errors.ErrValidation, "document must be a struct")
 	}
 
-	// Map to store bson field name to struct field
+	// Map to store both lowercase and original bson field names to struct fields
 	bsonToStructField := make(map[string]reflect.Value)
+	// Map to track field names in lowercase for case-insensitive matching
+	lowercaseToOriginal := make(map[string]string)
 
 	// Build the map of bson field names to struct fields
 	t := val.Type()
@@ -120,11 +121,21 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 		if bsonTag != "" {
 			parts := strings.Split(bsonTag, ",")
 			if parts[0] != "" && parts[0] != "-" {
-				bsonToStructField[parts[0]] = val.Field(i)
+				bsonName := parts[0]
+				bsonToStructField[bsonName] = val.Field(i)
+
+				// Also store lowercase version for case-insensitive matching
+				lowercaseBsonName := strings.ToLower(bsonName)
+				lowercaseToOriginal[lowercaseBsonName] = bsonName
 			}
 		} else {
 			// If no bson tag, use the field name
-			bsonToStructField[structField.Name] = val.Field(i)
+			fieldName := structField.Name
+			bsonToStructField[fieldName] = val.Field(i)
+
+			// Also store lowercase version
+			lowercaseFieldName := strings.ToLower(fieldName)
+			lowercaseToOriginal[lowercaseFieldName] = fieldName
 		}
 	}
 
@@ -134,8 +145,18 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 			continue
 		}
 
-		// Find the field by its BSON name
+		// Try exact match first
 		docField, exists := bsonToStructField[fieldName]
+
+		// If not found, try case-insensitive match
+		if !exists {
+			lowercaseFieldName := strings.ToLower(fieldName)
+			if originalName, found := lowercaseToOriginal[lowercaseFieldName]; found {
+				docField = bsonToStructField[originalName]
+				exists = true
+			}
+		}
+
 		if !exists {
 			return errors.WithDetails(errors.ErrValidation, fmt.Sprintf("required field '%s' not found in document", fieldName))
 		}
@@ -148,7 +169,18 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 
 	// Validate field types
 	for fieldName, field := range s.Fields {
+		// Try exact match first
 		docField, exists := bsonToStructField[fieldName]
+
+		// If not found, try case-insensitive match
+		if !exists {
+			lowercaseFieldName := strings.ToLower(fieldName)
+			if originalName, found := lowercaseToOriginal[lowercaseFieldName]; found {
+				docField = bsonToStructField[originalName]
+				exists = true
+			}
+		}
+
 		if !exists {
 			continue
 		}

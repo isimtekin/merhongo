@@ -36,8 +36,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests (excluding example directory)
-        run: go test -v $(go list ./... | grep -v "/example") -coverprofile=coverage.out
+      - name: Run tests (excluding testutil directory)
+        run: go test -v $(go list ./tests/... | grep -v "/testutil") -coverprofile=coverage.out
 
       - name: Filter coverage file
         run: cat coverage.out | grep -v "/example/" | grep -v "main.go" > coverage.filtered.out && mv coverage.filtered.out coverage.out

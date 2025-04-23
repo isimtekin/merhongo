@@ -27,9 +27,9 @@ func TestGenericModel_TimestampBehavior(t *testing.T) {
 		UpdatedAt time.Time          `bson:"updatedAt,omitempty"`
 	}
 
-	// Test with timestamps enabled
+	// Test with timestamps enabled - use lowercase to match bson tag
 	s := schema.New(map[string]schema.Field{
-		"Name": {Required: true},
+		"name": {Required: true},
 	}, schema.WithCollection(collName), schema.WithTimestamps(true))
 
 	m := model.NewGeneric[TimestampedDoc]("TimestampedDoc", s, client.Database)
@@ -102,11 +102,11 @@ func TestTimestampAndValidation(t *testing.T) {
 	// Validation flag to track when validation is called
 	validationCalled := false
 
-	// Create schema with custom validator
+	// Create schema with custom validator - use lowercase to match bson tag
 	s := schema.New(
 		map[string]schema.Field{
-			"Name":  {Required: true},
-			"Value": {Min: 1, Max: 100},
+			"name":  {Required: true},
+			"value": {Min: 1, Max: 100},
 		},
 		schema.WithCollection(collName),
 		schema.WithTimestamps(true),

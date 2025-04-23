@@ -28,11 +28,12 @@ type TestUser struct {
 func CreateTestSchema(collectionName string) *schema.Schema {
 	return schema.New(
 		map[string]schema.Field{
-			"Username": {Required: true, Unique: true},
-			"Email":    {Required: true, Unique: true},
-			"Age":      {Min: 18},
-			"Active":   {Type: true},
-			"Role":     {Type: ""},
+			// Use lowercase field names to match bson tags
+			"username": {Required: true, Unique: true},
+			"email":    {Required: true, Unique: true},
+			"age":      {Min: 18},
+			"active":   {Type: true},
+			"role":     {Type: ""},
 		},
 		schema.WithCollection(collectionName),
 	)
