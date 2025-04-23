@@ -1,4 +1,4 @@
-package merhongo_test
+package merhongo_test_test
 
 import (
 	"context"

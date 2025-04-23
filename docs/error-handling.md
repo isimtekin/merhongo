@@ -1,4 +1,4 @@
-# Error Handling in Merhongo
+# Error Handling
 
 Merhongo provides a comprehensive error handling system to make it easier to identify, handle, and respond to different types of errors that may occur during database operations.
 
@@ -6,14 +6,16 @@ Merhongo provides a comprehensive error handling system to make it easier to ide
 
 Merhongo defines several standard error types in the `errors` package:
 
-- `ErrNotFound`: Document not found in the collection
-- `ErrInvalidObjectID`: Invalid MongoDB ObjectID format
-- `ErrValidation`: Validation error for document fields
-- `ErrMiddleware`: Error occurred in middleware execution
-- `ErrNilCollection`: Operation attempted on a nil collection
-- `ErrDatabase`: General database operation error
-- `ErrConnection`: MongoDB connection error
-- `ErrDecoding`: Error decoding documents from MongoDB
+| Error Type | Description |
+|------------|-------------|
+| `ErrNotFound` | Document not found in the collection |
+| `ErrInvalidObjectID` | Invalid MongoDB ObjectID format |
+| `ErrValidation` | Validation error for document fields |
+| `ErrMiddleware` | Error occurred in middleware execution |
+| `ErrNilCollection` | Operation attempted on a nil collection |
+| `ErrDatabase` | General database operation error |
+| `ErrConnection` | MongoDB connection error |
+| `ErrDecoding` | Error decoding documents from MongoDB |
 
 ## Checking Error Types
 
@@ -24,50 +26,116 @@ import (
     "github.com/isimtekin/merhongo/errors"
 )
 
-// Using errors.Is
+// Using standard Go errors.Is
 if errors.Is(err, errors.ErrNotFound) {
     // Handle not found error
 }
 
-// Using helper functions
+// Using Merhongo helper functions
 if errors.IsNotFound(err) {
     // Handle not found error
 }
+if errors.IsValidationError(err) {
+    // Handle validation error
+}
+if errors.IsInvalidObjectID(err) {
+    // Handle invalid ObjectID error
+}
 ```
 
-## Error Handling Examples
+The available helper functions are:
 
-### Basic Error Checking
+- `IsNotFound(err error) bool`
+- `IsInvalidObjectID(err error) bool`
+- `IsValidationError(err error) bool`
+- `IsMiddlewareError(err error) bool`
+- `IsNilCollectionError(err error) bool`
+- `IsDatabaseError(err error) bool`
+- `IsConnectionError(err error) bool`
+- `IsDecodingError(err error) bool`
+
+## Creating Custom Errors
+
+Merhongo provides utility functions for wrapping or enhancing errors:
+
+### WithDetails
+
+Adds detailed information to a standard error:
 
 ```go
-user := &User{Username: "johndoe", Email: "john@example.com"}
-err := userModel.Create(ctx, user)
-if err != nil {
-    if errors.IsValidationError(err) {
-        fmt.Println("Validation error:", err)
-        return
+// Standard error with details
+err := errors.WithDetails(errors.ErrValidation, "username must be at least 3 characters")
+
+// Example in validation
+func validateUsername(username string) error {
+    if len(username) < 3 {
+        return errors.WithDetails(errors.ErrValidation, 
+            "username must be at least 3 characters long")
     }
-    fmt.Println("Failed to create user:", err)
-    return
+    return nil
 }
 ```
 
-### Error Details
+### Wrap
 
-All errors contain detailed information that you can access through the error message:
+Wraps an error with an additional context message:
 
 ```go
-err := userModel.FindById(ctx, "invalid-id", &result)
-if err != nil {
-    details := errors.GetErrorDetails(err)
-    fmt.Println("Error details:", details)
-    return
+// Wrap an error with context
+err := errors.Wrap(originalError, "failed to process user data")
+
+// Example in a service method
+func (s *UserService) ProcessUserData(userData []byte) error {
+    user, err := unmarshalUser(userData)
+    if err != nil {
+        return errors.Wrap(err, "could not parse user data")
+    }
+    // ...
 }
 ```
 
-### Structured Error Responses for HTTP APIs
+### WrapWithID
 
-You can convert errors to structured responses easily:
+Wraps an error and includes a document ID in the message:
+
+```go
+// Wrap an error with document ID
+err := errors.WrapWithID(errors.ErrNotFound, "user not found", userID)
+
+// Example in a service method
+func (s *UserService) GetUserByID(id string) (*User, error) {
+    user, err := s.userModel.FindById(ctx, id)
+    if err != nil {
+        return nil, errors.WrapWithID(err, "failed to retrieve user", id)
+    }
+    return user, nil
+}
+```
+
+## Getting Error Details
+
+You can get detailed information from an error:
+
+```go
+// Get full error details
+details := errors.GetErrorDetails(err)
+fmt.Println("Error details:", details)
+```
+
+## Formatting Errors for Display
+
+The `FormatError` function formats an error for logging or display:
+
+```go
+// Format error for display
+formattedError := errors.FormatError(err)
+fmt.Println(formattedError)
+// Output example: "[NotFound] document not found: user with ID '123' not found"
+```
+
+## Structured Error Responses for APIs
+
+The `ToErrorResponse` function converts errors to a structured format suitable for API responses:
 
 ```go
 import (
@@ -104,37 +172,13 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## Creating Custom Errors
-
-You can create custom errors that wrap the standard errors:
+The `ErrorResponse` struct has the following fields:
 
 ```go
-import (
-    "github.com/isimtekin/merhongo/errors"
-)
-
-// Create a specific validation error
-func validateUsername(username string) error {
-    if len(username) < 3 {
-        return errors.WithDetails(errors.ErrValidation, 
-            "username must be at least 3 characters long")
-    }
-    return nil
-}
-
-// Wrapping an error with context
-func (s *UserService) GetUserProfile(id string) (*Profile, error) {
-    var user User
-    err := userModel.FindById(ctx, id, &user)
-    if err != nil {
-        return nil, errors.Wrap(err, "failed to fetch user profile")
-    }
-    
-    // Create and return profile
-    return &Profile{
-        DisplayName: user.Username,
-        Email: user.Email,
-    }, nil
+type ErrorResponse struct {
+    Code    string `json:"code"`    // Error code like "not_found", "validation_error"
+    Message string `json:"message"` // Human-readable message
+    Details string `json:"details,omitempty"` // Detailed information
 }
 ```
 
@@ -145,3 +189,5 @@ func (s *UserService) GetUserProfile(id string) (*Profile, error) {
 3. **Check error types**: Use `errors.Is()` or the helper functions to check for specific error types.
 4. **Provide useful error messages**: Make error messages descriptive and helpful for debugging.
 5. **Return appropriate HTTP status codes**: Map Merhongo errors to appropriate HTTP status codes in web applications.
+6. **Centralize error handling**: Create error handling middleware for web applications.
+7. **Log detailed errors**: Log detailed errors on the server but return sanitized errors to clients.

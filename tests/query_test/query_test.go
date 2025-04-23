@@ -1,14 +1,15 @@
-package query
+package query_test
 
 import (
 	"github.com/isimtekin/merhongo/errors"
+	"github.com/isimtekin/merhongo/query"
 	"go.mongodb.org/mongo-driver/bson"
 	"testing"
 )
 
 func TestQueryBuilder_GetFilter(t *testing.T) {
 	// Simple filter
-	builder := New().Where("name", "john")
+	builder := query.New().Where("name", "john")
 	filter, err := builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -19,7 +20,7 @@ func TestQueryBuilder_GetFilter(t *testing.T) {
 	}
 
 	// Multiple conditions
-	builder = New().Where("age", 30).Where("active", true)
+	builder = query.New().Where("age", 30).Where("active", true)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -35,7 +36,7 @@ func TestQueryBuilder_GetFilter(t *testing.T) {
 
 func TestQueryBuilder_Operators(t *testing.T) {
 	// Test $eq operator
-	builder := New().Equals("age", 30)
+	builder := query.New().Equals("age", 30)
 	filter, err := builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -54,7 +55,7 @@ func TestQueryBuilder_Operators(t *testing.T) {
 	}
 
 	// Test $ne operator
-	builder = New().NotEquals("status", "inactive")
+	builder = query.New().NotEquals("status", "inactive")
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -73,7 +74,7 @@ func TestQueryBuilder_Operators(t *testing.T) {
 	}
 
 	// Test $gt operator
-	builder = New().GreaterThan("age", 25)
+	builder = query.New().GreaterThan("age", 25)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -92,7 +93,7 @@ func TestQueryBuilder_Operators(t *testing.T) {
 	}
 
 	// Test $lt operator
-	builder = New().LessThan("age", 50)
+	builder = query.New().LessThan("age", 50)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -112,7 +113,7 @@ func TestQueryBuilder_Operators(t *testing.T) {
 
 	// Test $in operator
 	values := []string{"active", "pending"}
-	builder = New().In("status", values)
+	builder = query.New().In("status", values)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -136,7 +137,7 @@ func TestQueryBuilder_Operators(t *testing.T) {
 }
 
 func TestQueryBuilder_SortByLimitSkip(t *testing.T) {
-	builder := New().
+	builder := query.New().
 		Where("active", true).
 		SortBy("name", true).
 		SortBy("age", false).
@@ -168,7 +169,7 @@ func TestQueryBuilder_SortByLimitSkip(t *testing.T) {
 }
 
 func TestQueryBuilder_Build(t *testing.T) {
-	builder := New().
+	builder := query.New().
 		Where("active", true).
 		GreaterThan("age", 25).
 		SortBy("name", true).
@@ -204,7 +205,7 @@ func TestQueryBuilder_Build(t *testing.T) {
 
 func TestQueryBuilder_ValidationErrors(t *testing.T) {
 	// Test empty key
-	builder := New().Where("", "value")
+	builder := query.New().Where("", "value")
 	_, err := builder.GetFilter()
 	if err == nil {
 		t.Error("expected error for empty key, got nil")
@@ -214,7 +215,7 @@ func TestQueryBuilder_ValidationErrors(t *testing.T) {
 	}
 
 	// Test negative limit
-	builder = New().Limit(-10)
+	builder = query.New().Limit(-10)
 	_, err = builder.GetOptions()
 	if err == nil {
 		t.Error("expected error for negative limit, got nil")
@@ -224,7 +225,7 @@ func TestQueryBuilder_ValidationErrors(t *testing.T) {
 	}
 
 	// Test negative skip
-	builder = New().Skip(-5)
+	builder = query.New().Skip(-5)
 	_, err = builder.GetOptions()
 	if err == nil {
 		t.Error("expected error for negative skip, got nil")
@@ -234,7 +235,7 @@ func TestQueryBuilder_ValidationErrors(t *testing.T) {
 	}
 
 	// Test error propagation
-	builder = New().Where("", "invalid") // This creates an error
+	builder = query.New().Where("", "invalid") // This creates an error
 	// The following operations should not clear the error
 	builder.Where("name", "john").Limit(10)
 
@@ -248,13 +249,13 @@ func TestQueryBuilder_ValidationErrors(t *testing.T) {
 func TestQueryBuilder_NewFeatures(t *testing.T) {
 	// Test WithError
 	expectedErr := errors.WithDetails(errors.ErrValidation, "test error")
-	builder := WithError(expectedErr)
+	builder := query.WithError(expectedErr)
 	if builder.Error() != expectedErr {
 		t.Errorf("expected error %v, got %v", expectedErr, builder.Error())
 	}
 
 	// Test WhereOperator
-	builder = New().WhereOperator("status", "$custom", "value")
+	builder = query.New().WhereOperator("status", "$custom", "value")
 	filter, err := builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -273,7 +274,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test GreaterThanOrEqual
-	builder = New().GreaterThanOrEqual("age", 18)
+	builder = query.New().GreaterThanOrEqual("age", 18)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -292,7 +293,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test LessThanOrEqual
-	builder = New().LessThanOrEqual("age", 65)
+	builder = query.New().LessThanOrEqual("age", 65)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -312,7 +313,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 
 	// Test NotIn
 	values := []string{"deleted", "banned"}
-	builder = New().NotIn("status", values)
+	builder = query.New().NotIn("status", values)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -335,7 +336,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test Exists
-	builder = New().Exists("email", true)
+	builder = query.New().Exists("email", true)
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -354,7 +355,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test Regex
-	builder = New().Regex("name", "^john", "i")
+	builder = query.New().Regex("name", "^john", "i")
 	filter, err = builder.GetFilter()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -376,7 +377,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test MergeFilter
-	builder = New().Where("active", true)
+	builder = query.New().Where("active", true)
 	additionalFilter := bson.M{"age": bson.M{"$gt": 18}}
 	builder.MergeFilter(additionalFilter)
 
@@ -402,7 +403,7 @@ func TestQueryBuilder_NewFeatures(t *testing.T) {
 	}
 
 	// Test merging complex filters
-	builder = New().Where("status", bson.M{"$in": []string{"active", "pending"}})
+	builder = query.New().Where("status", bson.M{"$in": []string{"active", "pending"}})
 	additionalFilter = bson.M{"status": bson.M{"$ne": "deleted"}}
 	builder.MergeFilter(additionalFilter)
 

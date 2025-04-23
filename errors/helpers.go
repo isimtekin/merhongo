@@ -46,6 +46,51 @@ func IsDecodingError(err error) bool {
 	return errors.Is(err, ErrDecoding)
 }
 
+// IsSchemaValidationError checks specifically for schema validation errors
+func IsSchemaValidationError(err error) bool {
+	// First check if it's a validation error at all
+	if !IsValidationError(err) {
+		return false
+	}
+
+	// Check if the error message contains schema validation related text
+	errStr := err.Error()
+	return strings.Contains(errStr, "field") ||
+		strings.Contains(errStr, "required") ||
+		strings.Contains(errStr, "validation") ||
+		strings.Contains(errStr, "minimum") ||
+		strings.Contains(errStr, "maximum") ||
+		strings.Contains(errStr, "empty")
+}
+
+// IsTimestampError checks for errors related to timestamps (if we add specific checks)
+func IsTimestampError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	return strings.Contains(errStr, "timestamp") ||
+		strings.Contains(errStr, "createdAt") ||
+		strings.Contains(errStr, "updatedAt")
+}
+
+// ValidationErrorDetails extracts more detailed information from validation errors
+func ValidationErrorDetails(err error) string {
+	if !IsValidationError(err) {
+		return ""
+	}
+
+	// Extract details after the error type prefix
+	errStr := err.Error()
+	parts := strings.SplitN(errStr, ":", 2)
+	if len(parts) > 1 {
+		return strings.TrimSpace(parts[1])
+	}
+
+	return errStr
+}
+
 // GetErrorDetails returns the detailed message from the error if available
 func GetErrorDetails(err error) string {
 	if err == nil {

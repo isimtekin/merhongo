@@ -1,10 +1,9 @@
 # Merhongo
 
 <div align="center">
-  <img src="./merhongo-logo.svg" alt="Merhongo Logo" />
+  <img src="./media/merhongo-logo.png" alt="Merhongo Logo" />
 </div>
 <div align="center">
-
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/isimtekin/merhongo.svg)](https://pkg.go.dev/github.com/isimtekin/merhongo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/isimtekin/merhongo)](https://goreportcard.com/report/github.com/isimtekin/merhongo)
@@ -31,20 +30,35 @@ Merhongo combines the power of the official MongoDB Go driver with an intuitive 
 ✅ **Automatic Timestamps**: Built-in createdAt/updatedAt field management  
 ✅ **Type-Safe Generic Models**: Create type-safe models with Go's generics  
 ✅ **Flexible Configuration**: Configure models with rich options API  
-✅ **High Test Coverage**: 82% of code covered by tests  
+✅ **Auto-Generate Schemas**: Generate schemas directly from struct definitions  
+✅ **High Test Coverage**: 84% of code covered by tests  
 ✅ **Comprehensive Documentation**: Detailed examples and guides
 
 ## Requirements
 
-- **Go**: Version 1.23.5 or higher
-- **MongoDB**: Compatible with MongoDB 4.4 or higher
-- **MongoDB Go Driver**: Version 1.17.3 (managed automatically via go modules)
+- **Go**: Version 1.18 or higher (for generics support)
+- **MongoDB**: Compatible with MongoDB 4.0 or higher (for transaction support)
+- **MongoDB Go Driver**: Version 1.17.3 or higher (managed automatically via go modules)
 
 ## Installation
 
 ```bash
 go get github.com/isimtekin/merhongo
 ```
+
+## Documentation
+
+Comprehensive documentation is available in the [docs](./docs) directory:
+
+- [Getting Started](./docs/getting-started.md) - Basic usage and examples
+- [Query Building](./docs/query-building.md) - Building complex MongoDB queries
+- [Schema Validation](./docs/schema-validation.md) - Defining validation rules
+- [Schema from Struct](./docs/schema-from-struct.md) - Generating schemas from structs
+- [Middleware](./docs/middleware.md) - Adding hooks for operations
+- [Error Handling](./docs/error-handling.md) - Working with Merhongo errors
+- [Transactions](./docs/transactions.md) - Using MongoDB transactions
+- [API Reference](./docs/api-reference.md) - Detailed API documentation
+- [FAQ](./docs/faq.md) - Frequently asked questions
 
 ## Quick Start
 
@@ -62,12 +76,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Define your model struct
+// Define your model struct with schema tags
 type User struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Username  string             `bson:"username" json:"username"`
-	Email     string             `bson:"email" json:"email"`
-	Age       int                `bson:"age" json:"age"`
+	Username  string             `bson:"username" json:"username" schema:"required,unique"`
+	Email     string             `bson:"email" json:"email" schema:"required,unique"`
+	Age       int                `bson:"age" json:"age" schema:"min=18,max=100"`
 	CreatedAt time.Time          `bson:"createdAt" json:"createdAt"`
 	UpdatedAt time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
@@ -80,13 +94,8 @@ func main() {
 	}
 	defer merhongo.Disconnect()
 
-	// Define a schema
-	userSchema := merhongo.SchemaNew(
-		map[string]schema.Field{
-			"Username": {Required: true, Unique: true},
-			"Email":    {Required: true, Unique: true},
-			"Age":      {Min: 18, Max: 100},
-		},
+	// Generate schema from struct
+	userSchema := schema.GenerateFromStruct(User{},
 		schema.WithCollection("users"),
 		schema.WithTimestamps(true),
 	)
@@ -114,8 +123,7 @@ func main() {
 		Where("username", "john_doe").
 		SortBy("createdAt", false)
 
-	var foundUser User
-	err = userModel.FindOneWithQuery(ctx, queryBuilder, &foundUser)
+	foundUser, err := userModel.FindOneWithQuery(ctx, queryBuilder)
 	if err != nil {
 		log.Fatalf("Failed to find user: %v", err)
 	}
@@ -124,11 +132,9 @@ func main() {
 }
 ```
 
-## Advanced Usage
+## Advanced Usage Examples
 
 ### Creating Models with Options
-
-You can create models with additional options for more flexibility:
 
 ```go
 // Define model with options
@@ -144,8 +150,6 @@ userModel := merhongo.ModelNew[User]("User", userSchema, merhongo.ModelOptions{
 
 ### Using Middleware
 
-Add middleware functions to schemas for pre/post operation hooks:
-
 ```go
 // Add pre-save middleware
 userSchema.Pre("save", func(doc interface{}) error {
@@ -158,9 +162,21 @@ userSchema.Pre("save", func(doc interface{}) error {
 })
 ```
 
-### Transactions
+### Query Building
 
-Execute multiple operations in a transaction:
+```go
+query := merhongo.QueryNew().
+    Where("age", 30).
+    GreaterThan("createdAt", lastWeek).
+    In("status", []string{"active", "pending"}).
+    SortBy("username", true).
+    Limit(10).
+    Skip(20)
+
+users, err := userModel.FindWithQuery(ctx, query)
+```
+
+### Transactions
 
 ```go
 err := client.ExecuteTransaction(ctx, func(sc mongo.SessionContext) error {
@@ -180,26 +196,7 @@ err := client.ExecuteTransaction(ctx, func(sc mongo.SessionContext) error {
 })
 ```
 
-### Query Building
-
-The query builder provides a fluent API for MongoDB queries:
-
-```go
-query := merhongo.QueryNew().
-    Where("age", 30).
-    GreaterThan("createdAt", lastWeek).
-    In("status", []string{"active", "pending"}).
-    SortBy("username", true).
-    Limit(10).
-    Skip(20)
-
-var users []User
-err := userModel.FindWithQuery(ctx, query, &users)
-```
-
 ## Error Handling
-
-Merhongo provides specialized error types for common MongoDB operations:
 
 ```go
 err := userModel.FindById(ctx, "invalid-id", &user)
@@ -222,18 +219,17 @@ Merhongo is thoroughly tested to ensure reliability:
 | merhongo    | 89%      |
 | connection  | 100%     |
 | model       | 89%      |
-| schema      | 49%      |
+| schema      | 84%      |
 | query       | 85%      |
 | errors      | 100%     |
 | **Overall** | **84%**  |
-
-The high test coverage helps ensure that Merhongo is stable and reliable for production use.
 
 ## Comparison with Other Libraries
 
 | Feature                 | Merhongo | mgo | mongo-go-driver | mgm   |
 |-------------------------|----------|-----|-----------------|-------|
 | Schema Validation       | ✅       | ❌   | ❌               | ⚠️ Limited |
+| Schema from Struct      | ✅       | ❌   | ❌               | ❌     |
 | Middleware Support      | ✅       | ❌   | ❌               | ✅     |
 | Query Builder           | ✅       | ❌   | ❌               | ❌     |
 | Error Types             | ✅       | ⚠️ Limited | ⚠️ Limited    | ❌     |

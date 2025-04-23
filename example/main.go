@@ -15,9 +15,9 @@ import (
 // User represents a user document in MongoDB
 type User struct {
 	ID        interface{} `bson:"_id,omitempty"`
-	Username  string      `bson:"username"`
-	Email     string      `bson:"email"`
-	Age       int         `bson:"age"`
+	Username  string      `bson:"username" schema:"required,unique"`
+	Email     string      `bson:"email" schema:"required,unique"`
+	Age       int         `bson:"age" schema:"min=18"`
 	Active    bool        `bson:"active"`
 	CreatedAt time.Time   `bson:"createdAt,omitempty"`
 	UpdatedAt time.Time   `bson:"updatedAt,omitempty"`
@@ -26,9 +26,9 @@ type User struct {
 // Product represents a product document in MongoDB
 type Product struct {
 	ID          interface{} `bson:"_id,omitempty"`
-	Name        string      `bson:"name"`
+	Name        string      `bson:"name" schema:"required"`
 	Description string      `bson:"description"`
-	Price       float64     `bson:"price"`
+	Price       float64     `bson:"price" schema:"required,min=0"`
 	InStock     bool        `bson:"inStock"`
 	CreatedAt   time.Time   `bson:"createdAt,omitempty"`
 	UpdatedAt   time.Time   `bson:"updatedAt,omitempty"`
@@ -43,6 +43,9 @@ func main() {
 
 	// Example 3: Using new generic models with options
 	genericModelExample()
+
+	// Example 4: Using schema generation from struct (New!)
+	schemaFromStructExample()
 }
 
 func basicExample() {
@@ -100,7 +103,7 @@ func basicExample() {
 		return nil
 	})
 
-	// Create a model (legacy style)
+	// Create a model using the generic model
 	userModel := merhongo.ModelNew[User]("User", userSchema, merhongo.ModelOptions{
 		Database: client.Database,
 	})
@@ -123,26 +126,24 @@ func basicExample() {
 
 	fmt.Printf("Created user: %+v\n", user)
 
-	// Find a user by ID
-	var foundUser User
-	err = userModel.FindById(ctx, user.ID.(string), &foundUser)
+	// Find a user by ID - note the type-safe return value for generic model
+	foundUser, err := userModel.FindById(ctx, user.ID.(string))
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Println("User not found")
 		} else {
 			log.Fatalf("Error finding user: %v", err)
 		}
+	} else {
+		fmt.Printf("Found user: %+v\n", foundUser)
 	}
 
-	fmt.Printf("Found user: %+v\n", foundUser)
-
-	// Use query builder to find users
+	// Use query builder to find users with type-safe return
 	q := merhongo.QueryNew().
 		Where("active", true).
 		GreaterThan("age", 18)
 
-	var users []User
-	err = userModel.FindWithQuery(ctx, q, &users)
+	users, err := userModel.FindWithQuery(ctx, q)
 	if err != nil {
 		log.Fatalf("Query error: %v", err)
 	}
@@ -236,16 +237,14 @@ func multiConnectionExample() {
 
 	fmt.Printf("Created product in products_db: %+v\n", product)
 
-	// Query each database
-	var users []User
-	err = userModel.Find(ctx, map[string]interface{}{}, &users)
+	// Query each database - using type-safe generic methods
+	users, err := userModel.Find(ctx, map[string]interface{}{})
 	if err != nil {
 		log.Fatalf("Error querying users: %v", err)
 	}
 	fmt.Printf("Found %d users in users_db\n", len(users))
 
-	var products []Product
-	err = productModel.Find(ctx, map[string]interface{}{}, &products)
+	products, err := productModel.Find(ctx, map[string]interface{}{})
 	if err != nil {
 		log.Fatalf("Error querying products: %v", err)
 	}
@@ -326,17 +325,117 @@ func genericModelExample() {
 	fmt.Printf("Custom validator was called: %v\n", validationCalled)
 
 	// Query using the type-safe model
-	var products []Product
-	err = productModel.FindWithQuery(
+	products, err := productModel.FindWithQuery(
 		ctx,
 		query.New().GreaterThan("price", 1000),
-		&products,
 	)
 	if err != nil {
 		log.Fatalf("Error querying products: %v", err)
 	}
 
 	fmt.Printf("Found %d premium products\n", len(products))
+}
+
+// New example showcasing schema generation from struct
+func schemaFromStructExample() {
+	fmt.Println("\n=== Schema From Struct Example ===")
+
+	// Connect to MongoDB
+	client, err := merhongo.Connect("mongodb://localhost:27017", "merhongo_schema_from_struct")
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+	}
+	defer merhongo.Disconnect()
+
+	// Generate schema directly from User struct
+	// Note: User struct has schema tags defined at the top of this file
+	userSchema := schema.GenerateFromStruct(User{},
+		schema.WithCollection("schema_users"),
+		schema.WithTimestamps(true),
+	)
+
+	// Customize schema after generation - using correct way to update map values
+	// The correct way to update a Field in a Schema is to:
+	// 1. Get the current field
+	// 2. Make a copy and update the copy
+	// 3. Assign the updated copy back to the map
+	emailField := userSchema.Fields["Email"]
+	emailField.ValidateFunc = func(value interface{}) bool {
+		email, ok := value.(string)
+		if !ok {
+			return false
+		}
+		// Simple email validation
+		return len(email) > 0 && contains(email, "@")
+	}
+	userSchema.Fields["Email"] = emailField
+
+	// Similar approach for setting default value
+	activeField := userSchema.Fields["Active"]
+	activeField.Default = true
+	userSchema.Fields["Active"] = activeField
+
+	// Add middleware
+	userSchema.Pre("save", func(doc interface{}) error {
+		fmt.Println("Pre-save middleware executed for schema generated from struct")
+		return nil
+	})
+
+	// Create a model with the generated schema
+	userModel := merhongo.ModelNew[User]("StructUser", userSchema, merhongo.ModelOptions{
+		Database: client.Database,
+	})
+
+	// Create a new user
+	ctx := context.Background()
+	user := &User{
+		Username: "schema_user",
+		Email:    "schema@example.com",
+		Age:      25,
+	}
+
+	err = userModel.Create(ctx, user)
+	if err != nil {
+		log.Fatalf("Failed to create user with schema from struct: %v", err)
+	}
+
+	fmt.Printf("Created user with schema from struct: %+v\n", user)
+
+	// Generate schema from Product struct
+	productSchema := schema.GenerateFromStruct(Product{},
+		schema.WithCollection("schema_products"),
+		schema.WithTimestamps(true),
+	)
+
+	// Create model with generated schema
+	productModel := merhongo.ModelNew[Product]("StructProduct", productSchema)
+
+	// Create a product
+	product := &Product{
+		Name:        "Generated Schema Product",
+		Description: "Created with schema from struct",
+		Price:       199.99,
+		InStock:     true,
+	}
+
+	err = productModel.Create(ctx, product)
+	if err != nil {
+		log.Fatalf("Failed to create product with schema from struct: %v", err)
+	}
+
+	fmt.Printf("Created product with schema from struct: %+v\n", product)
+
+	// Query using builder
+	q := merhongo.QueryNew().
+		Where("inStock", true).
+		SortBy("price", true)
+
+	products, err := productModel.FindWithQuery(ctx, q)
+	if err != nil {
+		log.Fatalf("Error querying products with schema from struct: %v", err)
+	}
+
+	fmt.Printf("Found %d in-stock products with schema from struct\n", len(products))
 }
 
 // Helper function to check if a string contains another string

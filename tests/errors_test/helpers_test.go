@@ -1,7 +1,8 @@
-package errors
+package errors_test
 
 import (
 	"fmt"
+	"github.com/isimtekin/merhongo/errors"
 	"strings"
 	"testing"
 )
@@ -16,68 +17,68 @@ func TestIsErrorFunctions(t *testing.T) {
 	}{
 		{
 			name:     "IsNotFound with ErrNotFound",
-			err:      ErrNotFound,
-			checkFn:  IsNotFound,
+			err:      errors.ErrNotFound,
+			checkFn:  errors.IsNotFound,
 			expected: true,
 		},
 		{
 			name:     "IsNotFound with wrapped ErrNotFound",
-			err:      Wrap(ErrNotFound, "database error"),
-			checkFn:  IsNotFound,
+			err:      errors.Wrap(errors.ErrNotFound, "database error"),
+			checkFn:  errors.IsNotFound,
 			expected: true,
 		},
 		{
 			name:     "IsNotFound with different error",
-			err:      ErrValidation,
-			checkFn:  IsNotFound,
+			err:      errors.ErrValidation,
+			checkFn:  errors.IsNotFound,
 			expected: false,
 		},
 		{
 			name:     "IsInvalidObjectID with ErrInvalidObjectID",
-			err:      ErrInvalidObjectID,
-			checkFn:  IsInvalidObjectID,
+			err:      errors.ErrInvalidObjectID,
+			checkFn:  errors.IsInvalidObjectID,
 			expected: true,
 		},
 		{
 			name:     "IsValidationError with ErrValidation",
-			err:      ErrValidation,
-			checkFn:  IsValidationError,
+			err:      errors.ErrValidation,
+			checkFn:  errors.IsValidationError,
 			expected: true,
 		},
 		{
 			name:     "IsMiddlewareError with ErrMiddleware",
-			err:      ErrMiddleware,
-			checkFn:  IsMiddlewareError,
+			err:      errors.ErrMiddleware,
+			checkFn:  errors.IsMiddlewareError,
 			expected: true,
 		},
 		{
 			name:     "IsNilCollectionError with ErrNilCollection",
-			err:      ErrNilCollection,
-			checkFn:  IsNilCollectionError,
+			err:      errors.ErrNilCollection,
+			checkFn:  errors.IsNilCollectionError,
 			expected: true,
 		},
 		{
 			name:     "IsDatabaseError with ErrDatabase",
-			err:      ErrDatabase,
-			checkFn:  IsDatabaseError,
+			err:      errors.ErrDatabase,
+			checkFn:  errors.IsDatabaseError,
 			expected: true,
 		},
 		{
 			name:     "IsConnectionError with ErrConnection",
-			err:      ErrConnection,
-			checkFn:  IsConnectionError,
+			err:      errors.ErrConnection,
+			checkFn:  errors.IsConnectionError,
 			expected: true,
 		},
 		{
 			name:     "IsDecodingError with ErrDecoding",
-			err:      ErrDecoding,
-			checkFn:  IsDecodingError,
+			err:      errors.ErrDecoding,
+			checkFn:  errors.IsDecodingError,
 			expected: true,
 		},
 		{
 			name:     "IsError with nil error",
 			err:      nil,
-			checkFn:  IsNotFound,
+			checkFn:  errors.IsNotFound,
 			expected: false,
 		},
 	}
@@ -111,19 +112,19 @@ func TestGetErrorDetails(t *testing.T) {
 		},
 		{
 			name:           "wrapped error",
-			err:            Wrap(ErrNotFound, "user lookup failed"),
+			err:            errors.Wrap(errors.ErrNotFound, "user lookup failed"),
 			expectedDetail: "user lookup failed: document not found",
 		},
 		{
 			name:           "error with details",
-			err:            WithDetails(ErrValidation, "field 'email' is invalid"),
+			err:            errors.WithDetails(errors.ErrValidation, "field 'email' is invalid"),
 			expectedDetail: "validation failed: field 'email' is invalid",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			detail := GetErrorDetails(tc.err)
+			detail := errors.GetErrorDetails(tc.err)
 			if detail != tc.expectedDetail {
 				t.Errorf("Expected detail '%s', got '%s'", tc.expectedDetail, detail)
 			}
@@ -145,17 +146,17 @@ func TestFormatError(t *testing.T) {
 		},
 		{
 			name:        "not found error",
-			err:         ErrNotFound,
+			err:         errors.ErrNotFound,
 			shouldMatch: "[NotFound]",
 		},
 		{
 			name:        "wrapped not found error",
-			err:         Wrap(ErrNotFound, "user lookup"),
+			err:         errors.Wrap(errors.ErrNotFound, "user lookup"),
 			shouldMatch: "[NotFound] user lookup",
 		},
 		{
 			name:        "validation error",
-			err:         WithDetails(ErrValidation, "required field"),
+			err:         errors.WithDetails(errors.ErrValidation, "required field"),
 			shouldMatch: "[Validation]",
 		},
 		{
@@ -167,7 +168,7 @@ func TestFormatError(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			formatted := FormatError(tc.err)
+			formatted := errors.FormatError(tc.err)
 			if tc.err != nil && !strings.Contains(formatted, tc.shouldMatch) {
 				t.Errorf("Formatted error '%s' should contain '%s'", formatted, tc.shouldMatch)
 			}
@@ -191,49 +192,49 @@ func TestToErrorResponse(t *testing.T) {
 		},
 		{
 			name:          "not found error",
-			err:           ErrNotFound,
+			err:           errors.ErrNotFound,
 			expectedCode:  "not_found",
 			expectedIsSet: true,
 		},
 		{
 			name:          "invalid object id",
-			err:           ErrInvalidObjectID,
+			err:           errors.ErrInvalidObjectID,
 			expectedCode:  "invalid_id",
 			expectedIsSet: true,
 		},
 		{
 			name:          "validation error",
-			err:           ErrValidation,
+			err:           errors.ErrValidation,
 			expectedCode:  "validation_error",
 			expectedIsSet: true,
 		},
 		{
 			name:          "middleware error",
-			err:           ErrMiddleware,
+			err:           errors.ErrMiddleware,
 			expectedCode:  "middleware_error",
 			expectedIsSet: true,
 		},
 		{
 			name:          "nil collection error",
-			err:           ErrNilCollection,
+			err:           errors.ErrNilCollection,
 			expectedCode:  "collection_error",
 			expectedIsSet: true,
 		},
 		{
 			name:          "database error",
-			err:           ErrDatabase,
+			err:           errors.ErrDatabase,
 			expectedCode:  "database_error",
 			expectedIsSet: true,
 		},
 		{
 			name:          "connection error",
-			err:           ErrConnection,
+			err:           errors.ErrConnection,
 			expectedCode:  "connection_error",
 			expectedIsSet: true,
 		},
 		{
 			name:          "decoding error",
-			err:           ErrDecoding,
+			err:           errors.ErrDecoding,
 			expectedCode:  "decoding_error",
 			expectedIsSet: true,
 		},
@@ -247,7 +248,7 @@ func TestToErrorResponse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			response := ToErrorResponse(tc.err)
+			response := errors.ToErrorResponse(tc.err)
 
 			// Check the error code
 			if response.Code != tc.expectedCode {
@@ -260,7 +261,7 @@ func TestToErrorResponse(t *testing.T) {
 			}
 
 			// For errors with details, check that details are included
-			if tc.err != nil && tc.err != ErrNotFound && tc.err != ErrValidation {
+			if tc.err != nil && tc.err != errors.ErrNotFound && tc.err != errors.ErrValidation {
 				if strings.Contains(tc.err.Error(), ":") && response.Details == "" {
 					t.Errorf("Expected details to be extracted from error")
 				}
@@ -271,10 +272,10 @@ func TestToErrorResponse(t *testing.T) {
 
 func TestErrorResponseStructure(t *testing.T) {
 	// Create a detailed error
-	err := WithDetails(ErrValidation, "field 'email' is invalid")
+	err := errors.WithDetails(errors.ErrValidation, "field 'email' is invalid")
 
 	// Convert to response
-	response := ToErrorResponse(err)
+	response := errors.ToErrorResponse(err)
 
 	// Check structure
 	if response.Code != "validation_error" {

@@ -124,7 +124,7 @@ type ModelOptions struct {
 // ModelNew is a convenience function to create a new model.
 // It accepts the model struct type as a generic parameter.
 // If no database is specified in options, it uses the default client's database.
-func ModelNew[T any](name string, schema *schema.Schema, options ...ModelOptions) *model.Model {
+func ModelNew[T any](name string, schema *schema.Schema, options ...ModelOptions) *model.GenericModel[T] {
 	// Default options
 	opts := ModelOptions{
 		AutoCreateIndexes: true,
@@ -154,8 +154,8 @@ func ModelNew[T any](name string, schema *schema.Schema, options ...ModelOptions
 		}
 	}
 
-	// Create the model
-	m := model.New(name, schema, db)
+	// Create the generic model
+	m := model.NewGeneric[T](name, schema, db)
 
 	// Apply custom validator if provided
 	if opts.CustomValidator != nil && m.Schema != nil {

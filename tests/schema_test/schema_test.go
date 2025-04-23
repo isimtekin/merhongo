@@ -1,17 +1,18 @@
-package schema
+package schema_test
 
 import (
+	"github.com/isimtekin/merhongo/schema"
 	"testing"
 )
 
 func TestSchemaCreation(t *testing.T) {
-	fields := map[string]Field{
+	fields := map[string]schema.Field{
 		"Email": {
 			Required: true,
 			Unique:   true,
 		},
 	}
-	s := New(fields, WithCollection("users"))
+	s := schema.New(fields, schema.WithCollection("users"))
 
 	if s.Fields["Email"].Required != true {
 		t.Errorf("Expected Email field to be required")
@@ -24,15 +25,15 @@ func TestSchemaCreation(t *testing.T) {
 
 func TestWithTimestampsOption(t *testing.T) {
 	// Default should be true
-	s := New(map[string]Field{})
+	s := schema.New(map[string]schema.Field{})
 	if !s.Timestamps {
 		t.Error("expected timestamps to be true by default")
 	}
 
 	// Now disable it
-	s = New(
-		map[string]Field{},
-		WithTimestamps(false),
+	s = schema.New(
+		map[string]schema.Field{},
+		schema.WithTimestamps(false),
 	)
 
 	if s.Timestamps {
@@ -41,7 +42,7 @@ func TestWithTimestampsOption(t *testing.T) {
 }
 
 func TestPreMiddlewareRegistration(t *testing.T) {
-	s := New(map[string]Field{})
+	s := schema.New(map[string]schema.Field{})
 
 	triggered := false
 	s.Pre("save", func(doc interface{}) error {

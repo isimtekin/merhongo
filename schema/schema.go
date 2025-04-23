@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/isimtekin/merhongo/errors"
 	"reflect"
+	"strings"
 )
 
 // Field represents a schema field definition with validation rules
@@ -13,6 +14,7 @@ type Field struct {
 	Required     bool
 	Default      interface{}
 	Unique       bool
+	Index        bool
 	Min          int
 	Max          int
 	Enum         []interface{}
@@ -26,6 +28,8 @@ type Schema struct {
 	Collection      string
 	Middlewares     map[string][]func(interface{}) error
 	CustomValidator func(doc interface{}) error
+	// ModelType holds a reference to the model type for validation purposes
+	ModelType interface{}
 }
 
 // Option is a function that configures a Schema
@@ -37,6 +41,7 @@ func New(fields map[string]Field, options ...Option) *Schema {
 		Fields:      fields,
 		Timestamps:  true,
 		Middlewares: make(map[string][]func(interface{}) error),
+		ModelType:   nil, // Initially empty
 	}
 
 	// Apply all provided options
@@ -58,6 +63,13 @@ func WithCollection(name string) Option {
 func WithTimestamps(enable bool) Option {
 	return func(s *Schema) {
 		s.Timestamps = enable
+	}
+}
+
+// WithModelType sets the model type for the schema
+func WithModelType(modelType interface{}) Option {
+	return func(s *Schema) {
+		s.ModelType = modelType
 	}
 }
 
@@ -84,6 +96,7 @@ func (s *Schema) ValidateDocument(doc interface{}) error {
 }
 
 // defaultValidation performs basic validation based on schema rules
+// defaultValidation performs basic validation based on schema rules
 func (s *Schema) defaultValidation(doc interface{}) error {
 	val := reflect.ValueOf(doc)
 	if val.Kind() == reflect.Ptr {
@@ -95,15 +108,35 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 		return errors.WithDetails(errors.ErrValidation, "document must be a struct")
 	}
 
+	// Map to store bson field name to struct field
+	bsonToStructField := make(map[string]reflect.Value)
+
+	// Build the map of bson field names to struct fields
+	t := val.Type()
+	for i := 0; i < t.NumField(); i++ {
+		structField := t.Field(i)
+		bsonTag := structField.Tag.Get("bson")
+
+		if bsonTag != "" {
+			parts := strings.Split(bsonTag, ",")
+			if parts[0] != "" && parts[0] != "-" {
+				bsonToStructField[parts[0]] = val.Field(i)
+			}
+		} else {
+			// If no bson tag, use the field name
+			bsonToStructField[structField.Name] = val.Field(i)
+		}
+	}
+
 	// Validate required fields
 	for fieldName, field := range s.Fields {
 		if !field.Required {
 			continue
 		}
 
-		// Try to find the field in the struct
-		docField := val.FieldByName(fieldName)
-		if !docField.IsValid() {
+		// Find the field by its BSON name
+		docField, exists := bsonToStructField[fieldName]
+		if !exists {
 			return errors.WithDetails(errors.ErrValidation, fmt.Sprintf("required field '%s' not found in document", fieldName))
 		}
 
@@ -115,8 +148,8 @@ func (s *Schema) defaultValidation(doc interface{}) error {
 
 	// Validate field types
 	for fieldName, field := range s.Fields {
-		docField := val.FieldByName(fieldName)
-		if !docField.IsValid() {
+		docField, exists := bsonToStructField[fieldName]
+		if !exists {
 			continue
 		}
 

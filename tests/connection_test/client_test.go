@@ -1,8 +1,9 @@
-package connection
+package connection_test
 
 import (
 	"context"
 	"errors"
+	"github.com/isimtekin/merhongo/connection"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -128,7 +129,7 @@ func (m *MockMongoClient) UseSession(ctx context.Context, fn func(mongo.SessionC
 // --- Standard connection tests using real MongoDB ---
 
 func TestConnectAndDisconnect(t *testing.T) {
-	client, err := Connect("mongodb://localhost:27017", "merhongo_test")
+	client, err := connection.Connect("mongodb://localhost:27017", "merhongo_test")
 	if err != nil {
 		t.Fatalf("connection failed: %v", err)
 	}
@@ -139,12 +140,12 @@ func TestConnectAndDisconnect(t *testing.T) {
 }
 
 func TestConnect_InvalidURI(t *testing.T) {
-	_, err := Connect("mongodb://invalidhost:27017", "merhongo_test")
+	_, err := connection.Connect("mongodb://invalidhost:27017", "merhongo_test")
 	assert.Error(t, err, "Expected error for invalid URI")
 }
 
 func TestExecuteTransaction_Success(t *testing.T) {
-	client, err := Connect("mongodb://localhost:27017", "merhongo_test")
+	client, err := connection.Connect("mongodb://localhost:27017", "merhongo_test")
 	if err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
@@ -158,7 +159,7 @@ func TestExecuteTransaction_Success(t *testing.T) {
 }
 
 func TestExecuteTransaction_FnError(t *testing.T) {
-	client, err := Connect("mongodb://localhost:27017", "merhongo_test")
+	client, err := connection.Connect("mongodb://localhost:27017", "merhongo_test")
 	if err != nil {
 		t.Fatalf("Connect failed: %v", err)
 	}
@@ -176,7 +177,7 @@ func TestExecuteTransaction_FnError(t *testing.T) {
 // --- Tests using testify mocks ---
 
 func TestClient_GetDatabase(t *testing.T) {
-	client, err := Connect("mongodb://localhost:27017", "merhongo_test_getdb")
+	client, err := connection.Connect("mongodb://localhost:27017", "merhongo_test_getdb")
 	if err != nil {
 		t.Skipf("Skipping test; could not connect to MongoDB: %v", err)
 		return
@@ -195,7 +196,7 @@ func TestClient_GetDatabase(t *testing.T) {
 
 func TestClient_RegisterModel_GetModel(t *testing.T) {
 	// Create client directly - no need for real MongoDB connection
-	client := &Client{
+	client := &connection.Client{
 		Models: make(map[string]interface{}),
 	}
 
@@ -215,7 +216,7 @@ func TestClient_RegisterModel_GetModel(t *testing.T) {
 }
 
 func TestClient_Disconnect_NilClient(t *testing.T) {
-	client := &Client{
+	client := &connection.Client{
 		MongoClient: nil,
 		Models:      make(map[string]interface{}),
 	}

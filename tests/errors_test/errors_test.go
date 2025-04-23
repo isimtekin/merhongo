@@ -1,22 +1,23 @@
-package errors
+package errors_test
 
 import (
 	stderrors "errors"
 	"fmt"
+	"github.com/isimtekin/merhongo/errors"
 	"testing"
 )
 
 func TestErrors_StandardErrors(t *testing.T) {
 	// Ensure all standard errors are defined
 	standardErrors := []error{
-		ErrNotFound,
-		ErrInvalidObjectID,
-		ErrValidation,
-		ErrMiddleware,
-		ErrNilCollection,
-		ErrDatabase,
-		ErrConnection,
-		ErrDecoding,
+		errors.ErrNotFound,
+		errors.ErrInvalidObjectID,
+		errors.ErrValidation,
+		errors.ErrMiddleware,
+		errors.ErrNilCollection,
+		errors.ErrDatabase,
+		errors.ErrConnection,
+		errors.ErrDecoding,
 	}
 
 	for _, err := range standardErrors {
@@ -31,9 +32,9 @@ func TestErrors_StandardErrors(t *testing.T) {
 
 func TestWithDetails(t *testing.T) {
 	// Test adding details to a standard error
-	baseErr := ErrValidation
+	baseErr := errors.ErrValidation
 	details := "field 'name' is required"
-	err := WithDetails(baseErr, details)
+	err := errors.WithDetails(baseErr, details)
 
 	// Check that the error message contains both the base error and details
 	expectedMsg := fmt.Sprintf("%s: %s", baseErr.Error(), details)
@@ -51,7 +52,7 @@ func TestWrap(t *testing.T) {
 	// Test wrapping an error with a message
 	baseErr := fmt.Errorf("original error")
 	message := "failed to process request"
-	err := Wrap(baseErr, message)
+	err := errors.Wrap(baseErr, message)
 
 	// Check that the error message contains both the message and original error
 	expectedMsg := fmt.Sprintf("%s: %s", message, baseErr.Error())
@@ -65,17 +66,17 @@ func TestWrap(t *testing.T) {
 	}
 
 	// Test that wrap returns nil for nil error
-	if Wrap(nil, message) != nil {
+	if errors.Wrap(nil, message) != nil {
 		t.Errorf("Wrap should return nil for nil error")
 	}
 }
 
 func TestWrapWithID(t *testing.T) {
 	// Test wrapping an error with a message and ID
-	baseErr := ErrNotFound
+	baseErr := errors.ErrNotFound
 	message := "failed to find user"
 	id := "507f1f77bcf86cd799439011"
-	err := WrapWithID(baseErr, message, id)
+	err := errors.WrapWithID(baseErr, message, id)
 
 	// Check that the error message contains the message, ID, and original error
 	expectedMsg := fmt.Sprintf("%s (ID: %s): %s", message, id, baseErr.Error())
@@ -89,17 +90,17 @@ func TestWrapWithID(t *testing.T) {
 	}
 
 	// Test that WrapWithID returns nil for nil error
-	if WrapWithID(nil, message, id) != nil {
+	if errors.WrapWithID(nil, message, id) != nil {
 		t.Errorf("WrapWithID should return nil for nil error")
 	}
 }
 
 func TestNestedWrapping(t *testing.T) {
 	// Test nested error wrapping
-	baseErr := ErrValidation
-	err1 := WithDetails(baseErr, "field validation failed")
-	err2 := Wrap(err1, "processing error")
-	err3 := WrapWithID(err2, "user operation failed", "user123")
+	baseErr := errors.ErrValidation
+	err1 := errors.WithDetails(baseErr, "field validation failed")
+	err2 := errors.Wrap(err1, "processing error")
+	err3 := errors.WrapWithID(err2, "user operation failed", "user123")
 
 	// Check that errors.Is works with deeply nested errors
 	if !stderrors.Is(err3, baseErr) {
